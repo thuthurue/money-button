@@ -1,0 +1,17 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>돈 버튼</title>
+<style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#dfe8dc;color:#2b2119}</style></head>
+<body><div id="m">게임 불러오는 중…</div>
+<script>
+(async()=>{
+const SB='https://xttwaxeaqeiuxwugaydc.supabase.co',K='sb_publishable_QL4qtfWpAZ7cMHx6mS3IrQ_XQuDbMCc',C='game_cache_v1';
+let html=null;
+try{
+  const r=await fetch(SB+'/rest/v1/game_files?name=eq.index&select=content',{headers:{apikey:K,Authorization:'Bearer '+K},cache:'no-store'});
+  const j=await r.json();
+  if(j&&j[0]&&j[0].content){html=j[0].content;try{localStorage.setItem(C,html)}catch(e){}}
+}catch(e){}
+if(!html){try{html=localStorage.getItem(C)}catch(e){}}
+if(!html){document.getElementById('m').textContent='게임을 불러오지 못했어요. 새로고침 해 주세요.';return}
+document.open();document.write(html);document.close();
+})();
+</script></body></html>
