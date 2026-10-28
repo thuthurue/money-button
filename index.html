@@ -205,6 +205,8 @@ button:focus-visible{outline:3px solid var(--leaf);outline-offset:3px}
       <button data-t="prest" id="tab-prest" role="tab" aria-selected="false" hidden>명성</button>
       <button data-t="awake" data-prest="25" role="tab" aria-selected="false" hidden>각성</button>
       <button data-t="wl" role="tab" aria-selected="false">재산</button>
+      <button data-t="cm" role="tab" aria-selected="false" hidden>커뮤니티</button>
+      <button data-t="up" role="tab" aria-selected="false" hidden>업데이트</button>
     </div>
   </div>
   <div class="qty" id="qty" role="group" aria-label="구매 수량" hidden><span>한 번에</span><button data-q="0"></button><button data-q="1"></button><button data-q="2"></button><button data-q="3"></button></div>
@@ -270,6 +272,8 @@ button:focus-visible{outline:3px solid var(--leaf);outline-offset:3px}
   <div class="list" id="l-wg" hidden></div>
   <div class="list" id="l-ck" hidden></div>
   <div class="list" id="l-wl" hidden></div>
+  <div class="list" id="l-cm" hidden></div>
+  <div class="list" id="l-up" hidden></div>
   <div class="list" id="l-awake" hidden>
     <div class="rebbox">
       <div class="reb-top"><span>각성석</span><b id="awake-n">0</b></div>
@@ -731,7 +735,7 @@ const faBig=n=>n<=1?Big.from(1):Big.fromLog10(faLog(n));
 const faExpN=()=>{const m=S.money;if(!m||!(m.m>0)||!(m.e>=1))return 0;return Math.min(5000,Math.floor(Math.log2(m.e)))};   // e 뒤 수가 2^n이 될 때마다 n+1
 const faN=()=>S.faMode===1?faExpN():faLv();
 const faMult=()=>S.aw16?faBig(faN()):Big.from(1);
-const sqfMult=()=>Big.mul(Big.mul(sqMult(),faMult()),Big.mul(Big.mul(p41Mult(),wlIncome()),Big.from(window.COMM_TOP?2:1)));   // 제곱·팩토리얼·명성 41·실버 (버는 돈에 곱해요)
+const sqfMult=()=>Big.mul(Big.mul(sqMult(),faMult()),Big.mul(Big.mul(p41Mult(),wlIncome()),Big.from((window.COMM_TOP?2:1)*(window.COMM_PLAYX||1))));   // 제곱·팩토리얼·명성 41·실버 (버는 돈에 곱해요)
 /* 스스로 부스트: 10^n 이상이면 배율 = n × max(1, floor(log10 n)). 13 → 13, 121 → 242 */
 const selfBoost=(n)=>{
   if(!(n>=1)||!isFinite(n))return Big.from(1);
@@ -2363,7 +2367,7 @@ function render(){
       document.querySelector('.tabs button[data-t="btn"]').setAttribute('aria-selected','true');
     }
   });
-  ['btn','reb','prest','m','p','sq','fa','awake','ws','wg','ck','wl'].forEach(id=>{const el=$('l-'+id); if(el) el.hidden=id!==TAB});
+  ['btn','reb','prest','m','p','sq','fa','awake','ws','wg','ck','wl','cm','up'].forEach(id=>{const el=$('l-'+id); if(el) el.hidden=id!==TAB});
   document.querySelectorAll('.trow').forEach(r=>{r.hidden=[...r.children].every(b=>b.hidden)});
   $('qty').hidden=prest<3||TAB!=='btn';
   document.querySelectorAll('.qty button').forEach((b,i)=>{
@@ -2817,8 +2821,8 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   TAB=b.dataset.t;
   document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
   try{const r=b.parentNode,rb=b.getBoundingClientRect(),rr=r.getBoundingClientRect();if(rb.left<rr.left)r.scrollLeft-=rr.left-rb.left+8;else if(rb.right>rr.right)r.scrollLeft+=rb.right-rr.right+8}catch(e){}   // 탭 줄만 옆으로 움직여요 (페이지는 안 밀어요)
-  ['btn','reb','prest','m','p','sq','fa','awake','ws','wg','ck','wl'].forEach(id=>$('l-'+id).hidden=id!==TAB);
-  render();if(TAB==='wl'&&window.wlPhone)wlPhone();
+  ['btn','reb','prest','m','p','sq','fa','awake','ws','wg','ck','wl','cm','up'].forEach(id=>$('l-'+id).hidden=id!==TAB);
+  render();if(TAB==='wl'&&window.wlPhone)wlPhone();if(window.cmTab)cmTab(TAB);if(window.upTab)upTab(TAB);
 });
 /* iPhone 모드: 화면을 옆으로 쓸어 넘기면 앱(탭)이 바뀌어요. 왼쪽으로 쓸면 다음, 오른쪽으로 쓸면 이전 */
 (function(){
@@ -2832,7 +2836,7 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   addEventListener('touchend',e=>{
     if(!sw)return;const c=e.changedTouches[0],dx=c.clientX-sw.x,dy=c.clientY-sw.y,dt=performance.now()-sw.t;sw=null;
     if(Math.abs(dx)<70||Math.abs(dy)>Math.abs(dx)*.6||dt>700)return;
-    const tabs=[...document.querySelectorAll('.tabs button')].filter(b=>!b.hidden),i=tabs.findIndex(b=>b.dataset.t===TAB),j=i+(dx<0?1:-1);
+    const tabs=[...document.querySelectorAll('.tabs button')].filter(b=>!b.hidden&&b.dataset.t!=='cm'&&b.dataset.t!=='up'),i=tabs.findIndex(b=>b.dataset.t===TAB),j=i+(dx<0?1:-1);
     if(i<0||j<0||j>=tabs.length)return;
     tabs[j].click();
     const el=$('l-'+TAB);if(el){const k=dx<0?'tabinL':'tabinR';el.classList.remove('tabinL','tabinR');void el.offsetWidth;el.classList.add(k);setTimeout(()=>el.classList.remove(k),300)}
@@ -3895,7 +3899,7 @@ render();
 #spanel .sdet{min-width:0}
 #spanel.swide .sdet{flex:1}
 #spanel .snb{margin:0;width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 12px;border:0;border-radius:10px;background:transparent;font-size:15px}
-#spanel .snb i{font-style:normal;color:var(--sub)}
+#spanel .snb[hidden]{display:none}#spanel .snb i{font-style:normal;color:var(--sub)}
 #spanel.swide .snb i{display:none}
 #spanel.swide .snb.on{background:var(--leaf-soft);font-weight:700}
 #spanel .ssec:not(.cur){display:none}
@@ -4064,8 +4068,8 @@ render();
     pan.querySelectorAll('input[name=smode]').forEach(r=>r.checked=!(UI.os==='base'&&window.aplPend)&&r.value===(m==='ipad'&&UI.mac?'mac':m));   // Apple OS를 막 골랐을 땐 iPhone·iPad·Mac 중 아무것도 골라져 있지 않아요
     pan.querySelectorAll('input[name=gmode]').forEach(r=>r.checked=r.value===window.GMODE);
     const lib=pan.querySelector('#slib');lib.value=UI.lib?'1':'0';pan.querySelector('#slib-l').hidden=m!=='iphone';
-    const ip2=m==='ipad'&&(!UI.ipp||UI.ipp==='c'||UI.ipp==='d');
-    pan.querySelector('#sbig-l').hidden=m!=='ipad';pan.querySelector('#sbig').value=UI.big?'1':'0';document.body.classList.toggle('bigic',!!UI.big&&m==='ipad');pan.querySelector('#sipg-l').hidden=m!=='ipad';pan.querySelector('#sipg').value=UI.ipg===0?'0':'1';document.body.classList.toggle('ipg',m==='ipad'&&UI.ipg!==0);pan.querySelector('#sosz-l').hidden=m!=='ipad'||!!UI.mac;pan.querySelector('#sosz').value=String(UI.osz||3);pan.querySelector('#smosz-l').hidden=!(m==='ipad'&&UI.mac);pan.querySelector('#smosz').value=window.macSz?window.macSz().k:'11';pan.querySelector('#smlk-l').hidden=UI.os==='base'&&!window.aplPend;pan.querySelector('#smal-l').hidden=UI.os==='base'&&!window.aplPend;pan.querySelector('#smal').value=String(UI.mal==null?0:UI.mal);pan.querySelector('#smti-l').hidden=m!=='ipad';pan.querySelector('#smti').value=UI.top==null?'a':String(UI.top);pan.querySelector('#smpw-l').hidden=m!=='ipad';pwSync();pan.querySelector('#smlc-l').hidden=m!=='ipad';lcSync();hbSync();pan.querySelector('#smlk').value=UI.mlk===1?'1':'0';pan.querySelector('#sipl-l').hidden=!ip2;pan.querySelector('#sipl').value=UI.ipl==='2'?'2':'1';pan.querySelector('#sipl-n').hidden=m!=='ipad'||ip2;
+    const ip2=m==='ipad'&&!UI.mac&&(!UI.ipp||UI.ipp==='c'||UI.ipp==='d');
+    pan.querySelector('#sbig-l').hidden=m!=='ipad';pan.querySelector('#sbig').value=UI.big?'1':'0';document.body.classList.toggle('bigic',!!UI.big&&m==='ipad');pan.querySelector('#sipg-l').hidden=m!=='ipad';pan.querySelector('#sipg').value=UI.ipg===0?'0':'1';document.body.classList.toggle('ipg',m==='ipad'&&UI.ipg!==0);pan.querySelector('#sosz-l').hidden=m!=='ipad'||!!UI.mac;pan.querySelector('#sosz').value=String(UI.osz||3);pan.querySelector('#smosz-l').hidden=!(m==='ipad'&&UI.mac);pan.querySelector('#smosz').value=window.macSz?window.macSz().k:'11';pan.querySelector('#smlk-l').hidden=UI.os==='base'&&!window.aplPend;pan.querySelector('#smal-l').hidden=UI.os==='base'&&!window.aplPend;pan.querySelector('#smal').value=String(UI.mal==null?0:UI.mal);pan.querySelector('#smti-l').hidden=m!=='ipad';pan.querySelector('#smti').value=UI.top==null?'a':String(UI.top);pan.querySelector('#smpw-l').hidden=m!=='ipad';pwSync();pan.querySelector('#smlc-l').hidden=m!=='ipad';lcSync();hbSync();pan.querySelector('#smlk').value=UI.mlk===1?'1':'0';pan.querySelector('#sipl-l').hidden=!ip2;pan.querySelector('#sipl').value=UI.ipl==='2'?'2':'1';pan.querySelector('#sipl-n').hidden=m!=='ipad'||!!UI.mac||ip2;
     pan.querySelector('#svib-l').parentElement.hidden=!(m==='iphone'&&(UI.os!=='base'||window.aplPend));   // 진동은 iPhone 모드에서만 울려요
     pan.querySelector('#snf-l').parentElement.hidden=UI.os==='base'&&!window.aplPend;   // 알림 센터는 기본 OS에는 없어요
   }
@@ -4164,6 +4168,11 @@ pan.addEventListener('click',e=>{if(pan.classList.contains('inpane'))return;if(e
 
 /* 업데이트 목록: 여기만 고치면 iPad·Mac 업데이트 앱, iPhone 앱 보관함, 설정 > 업데이트에 다 같이 나와요. s: 'soon'=예정, 'done'=됨 */
 window.UPDATES_LIST=[
+    {id:19,s:'done',d:'2026-10-28',t:'Mac 모드에서 iPad 표시 없애기',x:'Mac 모드인데 iPad용 창 크기 손잡이(아래쪽 작은 막대)와 설정의 2줄 방식이 남아 있던 걸 고쳤어요.'},
+    {id:18,s:'done',d:'2026-10-28',t:'설정에서 쓸 수 있는 것만 보이기',x:'설정 왼쪽 목록에 지금 모드에서 쓸 수 없는 칸(진동·알림 등)이 같이 보이던 걸 고쳤어요. 이제 쓸 수 있는 칸만 보여요.'},
+    {id:17,s:'done',d:'2026-10-28',t:'삭제된 계정 30일 보관·복구',x:'운영자가 계정을 지우면 순위에서는 바로 사라지지만 서버에 30일 동안 보관돼요. 그 안에는 운영자 앱의 🗂️ 삭제된 계정에서 복구할 수 있고, 30일이 지나면 완전히 지워져요.'},
+    {id:16,s:'done',d:'2026-10-28',t:'운영자 앱',x:'운영자 계정에서 설정 > 계정의 🛠️ 에서 앱을 설치하면, 다른 사람 계정을 삭제하거나 재산을 줄 수 있어요. 누르면 한 번 더 확인하고, 상대가 게임을 켜면 알림이 떠요.'},
+    {id:15,s:'done',d:'2026-10-28',t:'플레이타임 순위·보상',x:'커뮤니티 앱에 ⏱️ 플레이타임 탭이 생겼어요. 게임 화면을 보고 있는 시간이 계정마다 쌓이고, 1~100위를 볼 수 있어요. 보상: 1등 버는 돈 ×1.5 · 2~10등 ×1.2 (재산 1등 보너스와 같이 받아요).'},
     {id:14,s:'done',d:'2026-10-27',t:'서버에 저장·불러오기',x:'설정 > 계정의 ☁️ 에서 이름과 비밀번호로 저장하면 진행과 계정이 서버에 복사돼요. 브라우저 기록을 지워도 같은 이름·비밀번호로 불러올 수 있어요.'},
     {id:13,s:'done',d:'2026-10-27',t:'초대 코드',x:'커뮤니티 앱에서 순위를 보고 올리려면 초대 코드를 한 번 입력해야 해요. 코드는 이 기기에 저장돼요.'},
     {id:12,s:'done',d:'2026-10-27',t:'운영자 확인 방식 바뀜',x:'테스트·울트라 모드는 운영자로 확인된 기기에서만 쓸 수 있어요.'},
@@ -4198,6 +4207,7 @@ window.UPDATES_LIST=[
     if(UI.set&&UI.set.hid)add('⚙️','설정',()=>document.getElementById('stab').click());          // 밀어 넣은 앱은 누르면 나와요
     if(NW.hid&&NW.small)add('💬','설명',()=>document.getElementById('ntab').click());
     add('🔔','업데이트',()=>{if(window.openUpdates)window.openUpdates()});
+    if(window.opVisible&&window.opVisible())add('🛠️','운영자',()=>{if(window.OPAPP)window.OPAPP.open()});
     if(window.cmVisible&&window.cmVisible())add('🏆','커뮤니티',()=>{if(window.COMM)window.COMM.open()});
     APPS.forEach(([t,n,ic])=>{const tb=document.querySelector('.tabs button[data-t="'+t+'"]');if(tb&&!tb.hidden)add(ic,n,()=>tb.click())});   // 열린 게임 파트만
   }
@@ -4535,7 +4545,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   const GUP=22;
   const gCan=dir=>gfull?dir==='L':(!!(GNEXT[gside()][UI.ipp||'c']||{})[dir]||(dir==='R'&&(UI.ipp==='c'||UI.ipp==='d')));   // 2:2에서 더 늘리면 3:2(전체), 3:2에서 줄이면 2:2
   function gripPos(){
-    if(UI.mode!=='ipad'||wrapOff||mini.g){grip.hidden=true;return}
+    if(UI.mode!=='ipad'||UI.mac||wrapOff||mini.g){grip.hidden=true;return}
     const r=stage.getBoundingClientRect(),[bs,be]=gfull?[0,3]:(GEDGE[UI.ipp||'c']||GEDGE.c),cw=r.width/3;
     grip.hidden=false;
     grip.style.left=(gfull||gside()==='R'?r.left+cw*be-66-GUP:r.left+cw*bs+2+GUP)+'px';   // 모서리에서 안쪽 위(대각선)로 띄워 애플 하단바(홈 표시)와 안 겹치게
@@ -6122,7 +6132,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
 (function(){
   const LKEY='acc-list-v1',CKEY='acc-cur-v1',OP='thu_thu_rue',MAX=20;
   const cmv=document.createElement('div');cmv.id='scmv';cmv.style.padding='4px 0 24px';
-  cmv.innerHTML='<small id="cm-s" class="acc-sm"></small><h4 class="cm-h4">🏆 돈 순위</h4><div id="cm-l"></div>';
+  cmv.innerHTML='<small id="cm-s" class="acc-sm"></small><div class="cm-tabs"><button type="button" id="cm-tm" class="on">💰 재산</button><button type="button" id="cm-tp">⏱️ 플레이타임</button></div><div id="cm-rw" class="cm-rw"></div><div id="cm-l"></div>';
   const hold=document.createElement('div');hold.hidden=true;hold.id='cmhold';hold.appendChild(cmv);document.body.appendChild(hold);
   window.cmEl=()=>cmv;window.cmHome=()=>{hold.appendChild(cmv)};
   setInterval(()=>{if(!document.body.contains(cmv))hold.appendChild(cmv)},1500);
@@ -6146,7 +6156,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     return '';
   }
   let ownerReady=false;
-  window.ACC={list:()=>list.slice(),me,OP,isOp:()=>{const a=me();return !!a&&norm(a.name)===OP&&window.ACC_OWNER===true},checkName};
+  window.ACC={list:()=>list.slice(),add:a=>{if(!a||!a.id||!a.name||list.some(x=>x.id===a.id)||list.length>=MAX)return false;list.push({id:a.id,name:a.name,bio:'',emoji:a.emoji||EMOJI[0],color:a.color||COLORS[0],created:Date.now()});if(!cur)cur=a.id;save();return true},remove:id=>{const n=list.length;list=list.filter(x=>x.id!==id);if(list.length===n)return false;if(cur===id)cur=list[0]?list[0].id:null;save();return true},me,OP,isOp:()=>{const a=me();return !!a&&norm(a.name)===OP&&window.ACC_OWNER===true},checkName};
   // 운영자 확인: 이 게임 링크를 만든 소유자로 로그인했을 때만 thu_thu_rue 계정이 운영자예요
   (async()=>{try{
     let k=null;
@@ -6303,7 +6313,32 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   document.head.appendChild(css);
   const root=document.createElement('div');root.id='comm';root.hidden=true;
   root.innerHTML='<div class="cm-box" role="dialog" aria-label="커뮤니티"><div class="cm-h"><span>🏆 커뮤니티</span><button type="button" id="cm-x" aria-label="닫기">✕</button></div><div class="cm-l" id="cm-slot"></div></div>';
-  const c2=document.createElement('style');c2.textContent='#scmv .cm-r{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:12px}#scmv .cm-r.me{background:rgba(74,157,107,.18)}#scmv .cm-n{width:34px;text-align:center;font-weight:700}#scmv .cm-a{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}#scmv .cm-nm{flex:1;min-width:0;word-break:break-all}#scmv .cm-m{font-size:13px;color:var(--sub,#666);white-space:nowrap}#scmv .acc-sm{display:block;font-size:13px;color:var(--sub,#666);margin:4px 0 8px}#scmv .cm-h4{margin:14px 0 6px;font-size:15px}';document.head.appendChild(c2);
+  const c2=document.createElement('style');c2.textContent='#scmv .cm-r{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:12px}#scmv .cm-r.me{background:rgba(74,157,107,.18)}#scmv .cm-n{width:34px;text-align:center;font-weight:700}#scmv .cm-a{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}#scmv .cm-nm{flex:1;min-width:0;word-break:break-all}#scmv .cm-m{font-size:13px;color:var(--sub,#666);white-space:nowrap}#scmv .acc-sm{display:block;font-size:13px;color:var(--sub,#666);margin:4px 0 8px}#scmv .cm-h4{margin:14px 0 6px;font-size:15px}#scmv .cm-tabs{display:flex;gap:6px;margin:6px 0 8px}#scmv .cm-tabs button{flex:1;padding:8px 6px;border-radius:10px;border:1px solid var(--line,#ccc);background:transparent;color:inherit;font-size:14px}#scmv .cm-tabs button.on{background:rgba(74,157,107,.22);font-weight:700}#scmv .cm-rw{font-size:13px;color:var(--sub,#666);margin:0 0 8px;line-height:1.5}';document.head.appendChild(c2);
+  /* 플레이타임: 화면이 보이는 동안 계정마다 1초씩 쌓아요 (이 기기에 저장 · 서버는 실제 시간보다 빨리 오르는 걸 막아요) */
+  const PKEY='mb-play-v1';let PL={},rkTab='money',lastPlay=0;
+  try{const v=JSON.parse(localStorage.getItem(PKEY)||'{}');if(v&&typeof v==='object')PL=v}catch(e){}
+  const myPlay=()=>{const a=window.ACC&&window.ACC.me();return a?Math.floor(PL[a.id]||0):0};
+  function fmtT(t){t=Math.max(0,Math.floor(t||0));const d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60),sc=t%60;
+    return d?d+'일 '+h+'시간':h?h+'시간 '+m+'분':m?m+'분 '+sc+'초':sc+'초'}
+  let pSave=0;setInterval(()=>{const a=window.ACC&&window.ACC.me();if(!a||document.hidden)return;PL[a.id]=(PL[a.id]||0)+1;
+    if(++pSave>=5){pSave=0;try{localStorage.setItem(PKEY,JSON.stringify(PL))}catch(e){}}},1000);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){try{localStorage.setItem(PKEY,JSON.stringify(PL))}catch(e){}}});
+  async function publishPlay(force){
+    const a=window.ACC&&window.ACC.me();if(!a||!ok()||!CODE||canWrite===false)return;
+    if(norm(a.name)===window.ACC.OP)return;const now=Date.now();if(!force&&now-lastPlay<60000)return;
+    const v=myPlay();if(v<1)return;lastPlay=now;
+    try{await rpc('publish_play',{p_id:uid+'_'+a.id,p_token:TOK,p_code:CODE,p_play:v})}catch(e){}
+  }
+  /* 플레이타임 순위 보상: 1등 버는 돈 ×1.5 · 2~10등 ×1.2 */
+  function playBonus(i){return i===0?1.5:(i>0&&i<10?1.2:1)}
+  const rwTxt='🎁 플레이타임 보상 · 1등 버는 돈 ×1.5 · 2~10등 ×1.2';
+  window.COMM_PLAYX=1;
+  async function checkPlayTop(){try{if(!ok()||!CODE||!(window.ACC&&window.ACC.me()))return;
+    const rows=(await rpc('get_top_play',{p_limit:30,p_code:CODE})||[]).filter(p=>norm(p.name)!==window.ACC.OP&&p.play>0);
+    const i=rows.findIndex(p=>p.id.indexOf(uid+'_')===0);window.COMM_PLAYX=i<0?1:playBonus(i)}catch(e){}}
+  setInterval(checkPlayTop,30000);setTimeout(checkPlayTop,5000);
+  const tabSet=t=>{rkTab=t;const a=$c('cm-tm'),b=$c('cm-tp');if(a)a.className=t==='money'?'on':'';if(b)b.className=t==='play'?'on':'';loadRank()};
+  document.addEventListener('click',e=>{const id=e.target&&e.target.id;if(id==='cm-tm')tabSet('money');else if(id==='cm-tp')tabSet('play')});
   window.cmFill=()=>{openOn=true;loadRank()};window.cmLeave=()=>{openOn=false};setInterval(()=>{if(openOn)loadRank()},30000);
   const opk=()=>window.ACC.OP;
   async function checkTop(){try{if(!ok()||!CODE||!(window.ACC&&window.ACC.me()))return;const rows=await rpc('get_top',{p_limit:30,p_code:CODE});const t=(rows||[]).find(p=>norm(p.name)!==opk());window.COMM_TOP=!!(t&&t.id.indexOf(uid+'_')===0)}catch(e){}}
@@ -6340,6 +6375,24 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     if(!(window.ACC&&window.ACC.me())){st.textContent='계정을 만들면 순위에 올라가요.'}
     else if(canWrite===false){st.textContent='보기만 가능해요. 내 돈을 올리려면 이 게임 공유 권한이 기여자(Contributor) 이상이어야 해요.'}
     else st.textContent='내 돈은 30초마다 올라가요.';
+    const rw=$c('cm-rw');if(rw)rw.textContent=rkTab==='play'?rwTxt:'👑 재산 1등 보너스 · 돈의 가치 +100%';
+    if(rkTab==='play'){
+      try{
+        await publish(true);await publishPlay(true);
+        const rows=await rpc('get_top_play',{p_limit:TOP+30,p_code:CODE});
+        const docs=(rows||[]).filter(p=>norm(p.name)!==window.ACC.OP).slice(0,TOP);
+        let mine=-1;
+        docs.forEach((p,i)=>{const me=p.id.indexOf(uid+'_')===0;if(me&&mine<0)mine=i;ls.append(row(i+1,{name:p.name,emoji:p.emoji,color:p.color,money:fmtT(p.play)},me))});
+        window.COMM_PLAYX=mine<0?1:playBonus(mine);
+        if(mine>=0&&window.COMM_PLAYX>1)st.textContent='🎁 내 보상: 버는 돈 ×'+window.COMM_PLAYX;
+        if(!docs.length)ls.textContent='아직 아무도 없어요.';
+        else if(mine<0&&canWrite!==false&&window.ACC&&window.ACC.me()&&norm(window.ACC.me().name)!==window.ACC.OP){
+          const v=myPlay(),hi=await rpc('rank_above_play',{p_play:v,p_code:CODE});
+          const me=window.ACC.me();ls.append(row(Number(hi)+1,{name:me.name,emoji:me.emoji,color:me.color,money:fmtT(v)},true));
+        }
+      }catch(e){if(!CODE){showCode(ls,st);return}st.textContent='순위를 불러오지 못했어요. 잠시 뒤에 다시 열어주세요.'}
+      return;
+    }
     try{
       await publish(true);
       const rows=await rpc('get_top',{p_limit:TOP+30,p_code:CODE});
@@ -6355,6 +6408,17 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     }catch(e){if(!CODE){showCode(ls,st);return}st.textContent='순위를 불러오지 못했어요. 잠시 뒤에 다시 열어주세요.'}
   }
   window.cmVisible=()=>inst&&!!(window.ACC&&window.ACC.me());
+  /* iPhone 모드: 커뮤니티는 홈에서 다른 앱(탭)처럼 열려요. 버튼 화면 위에 겹치는 팝업이 아니라 자기 화면(l-cm)이에요 */
+  let prevTab='';
+  window.cmTab=t=>{
+    if(t==='cm'){const q=$c('l-cm'),v=window.cmEl&&window.cmEl();if(q&&v&&v.parentNode!==q)q.appendChild(v);if(window.cmFill)window.cmFill()}
+    else if(prevTab==='cm'){if(window.cmLeave)window.cmLeave();if(window.cmHome)window.cmHome()}
+    prevTab=t};
+  const cmSync=()=>{const b=document.querySelector('.tabs button[data-t="cm"]');if(!b)return;
+    const off=!(document.body.classList.contains('phoneos')&&window.cmVisible());
+    if(b.hidden!==off)b.hidden=off;
+    if(off&&typeof TAB==='string'&&TAB==='cm'){const o=document.querySelector('.tabs button[data-t="btn"]');if(o)o.click()}};
+  cmSync();setInterval(cmSync,150);['cm-inst','acc-change'].forEach(k=>window.addEventListener(k,cmSync));
   window.COMM={open(){openOn=true;root.hidden=false;const s=$c('cm-slot');if(s&&window.cmEl)s.appendChild(window.cmEl());loadRank()}};
 
   // 설정 > 계정 안의 커뮤니티 칸
@@ -6371,11 +6435,137 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     if(ready&&!ok()){const s=document.createElement('small');s.textContent='순위 서버에 연결하지 못했어요.';b.append(s)}
   }
   window.addEventListener('acc-change',()=>{paint();lastPub=0;publish(true)});
-  setInterval(()=>{if(!inst)return;if(!$c('scomm')?.childElementCount)paint();publish(false)},10000);
+  setInterval(()=>{if(!inst)return;if(!$c('scomm')?.childElementCount)paint();publish(false);publishPlay(false)},10000);
   
   (function wait(){if($c('scomm'))paint();else setTimeout(wait,300)})();
   window.MB_rpc=rpc;window.MB_code=()=>CODE;
   init();
+})();
+
+/* ---------- 운영자 앱: 다른 사람 계정 삭제 · 재산 주기 · 상대에게 알림. 운영자 확인은 서버가 해요 ---------- */
+(function(){
+  const IK='op-inst-v1';let inst=false;try{inst=localStorage.getItem(IK)==='1'}catch(e){}
+  const $=id=>document.getElementById(id);
+  const ls=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}};
+  const rpc=(f,a)=>window.MB_rpc(f,a);
+  const isOp=()=>!!(window.ACC&&window.ACC.isOp&&window.ACC.isOp());
+  window.opVisible=()=>inst&&isOp();
+  const ERR={bad_code:'커뮤니티 앱에서 초대 코드를 먼저 넣어 주세요',not_admin:'운영자 확인이 안 됐어요',no_player:'그 계정이 이제 없어요',bad_amount:'금액은 숫자나 1e30처럼 써 주세요'};
+  const errT=e=>{const m=String(e&&e.message||'');for(const k in ERR)if(m.indexOf(k)>=0)return ERR[k];return '서버에 연결하지 못했어요'};
+  const money=a=>{a=String(a||'0');const n=Number(a);if(isFinite(n))return Big.from(n);const m=/^([0-9.]+)e([0-9]+)$/.exec(a);if(!m)return Big.from(0);return Big.mul(Big.from(parseFloat(m[1])),Big.pow(Big.from(10),parseInt(m[2],10)))};
+  const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+  const btn=(t,f)=>{const b=el('button',null,t);b.type='button';b.onclick=f;return b};
+  const css=document.createElement('style');
+  css.textContent='.opo{position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:12px}.opo[hidden]{display:none}'+
+  '.opb{background:var(--card,#fff);color:var(--ink,#222);border:1px solid var(--line,#ccc);border-radius:18px;width:min(440px,100%);max-height:86vh;overflow:auto;padding:14px}'+
+  '.opb h3{margin:0 0 8px;font-size:17px}.opr{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line,#ddd)}.opr .n{flex:1;min-width:0;word-break:break-all}.opr small{display:block;color:var(--sub,#666)}'+
+  '.opb input{width:100%;box-sizing:border-box;padding:9px;margin:4px 0;border-radius:10px;border:1px solid var(--line,#ccc);font-size:16px}.opb .row{display:flex;gap:8px;margin-top:8px}.opb .row button{flex:1}.opm{font-size:13px;color:var(--sub,#666);min-height:1.2em;margin:6px 0;white-space:pre-wrap}';
+  document.head.appendChild(css);
+
+  /* 받는 사람에게 뜨는 알림 */
+  const nroot=el('div','opo');nroot.hidden=true;const nbox=el('div','opb');nroot.appendChild(nbox);document.body.appendChild(nroot);
+  function notify(lines){nbox.textContent='';nbox.append(el('h3',null,'📣 운영자 알림'));lines.forEach(t=>nbox.append(el('div','opm',t)));nbox.append(btn('확인',()=>{nroot.hidden=true}));nroot.hidden=false}
+
+  /* 운영자 앱 화면 */
+  const root=el('div','opo');root.hidden=true;const box=el('div','opb');root.appendChild(box);document.body.appendChild(root);
+  root.addEventListener('click',e=>{if(e.target===root)root.hidden=true});
+  let note='';
+  const head=t=>{box.textContent='';const h=el('h3',null,t);box.append(h)};
+  async function showList(msg){
+    head('🛠️ 운영자 앱');const m=el('div','opm',msg||'계정을 고르면 재산을 주거나 삭제할 수 있어요. 상대에게 알림이 가요.');box.append(m);
+    const lst=el('div');box.append(lst,el('div','row'));box.lastChild.append(btn('🗂️ 삭제된 계정',()=>showDeleted()),btn('닫기',()=>{root.hidden=true}));
+    try{
+      const rows=(await rpc('get_top',{p_limit:200,p_code:window.MB_code()})||[]).filter(p=>String(p.name||'').normalize('NFC').trim().toLowerCase()!==window.ACC.OP);
+      if(!rows.length)lst.textContent='아직 다른 계정이 없어요.';
+      rows.forEach(p=>{const r=el('div','opr');const n=el('div','n');n.append(el('span',null,(p.emoji||'🙂')+' '+(p.name||'?')),el('small',null,p.money||'0'));
+        r.append(n,btn('💰',()=>giftForm(p)),btn('🗑️',()=>delConfirm(p)));lst.append(r)});
+    }catch(e){m.textContent=errT(e)}
+  }
+  async function showDeleted(msg){
+    head('🗂️ 삭제된 계정');const m=el('div','opm',msg||'30일 동안 보관돼요. 복구하면 순위에 다시 올라가요.');const lst=el('div');box.append(m,lst,btn('뒤로',()=>showList()));
+    try{
+      const rows=await rpc('admin_list_deleted',{p_key:ls('mb-owner-key'),p_code:window.MB_code()})||[];
+      if(!rows.length)lst.textContent='삭제된 계정이 없어요.';
+      rows.forEach(p=>{const left=Math.max(0,Math.ceil((Number(p.deleted_at)+2592000000-Date.now())/86400000));
+        const r=el('div','opr');const n=el('div','n');n.append(el('span',null,(p.emoji||'🙂')+' '+(p.name||'?')),el('small',null,(p.money||'0')+' · '+left+'일 남음'));
+        r.append(n,btn('♻️ 복구',()=>restoreConfirm(p)));lst.append(r)});
+    }catch(e){m.textContent=errT(e)}
+  }
+  function restoreConfirm(p){
+    head('♻️ 복구 확인');box.append(el('div','opm',(p.emoji||'🙂')+' '+p.name+' 계정을 복구할까요?\n순위에 다시 올라가고, 상대에게 알림이 가요.'));
+    const m=el('div','opm'),row=el('div','row');box.append(m,row);
+    const ok=btn('✅ 확인, 복구',async()=>{ok.disabled=true;m.textContent='복구하는 중…';
+      try{await rpc('admin_restore_player',{p_key:ls('mb-owner-key'),p_code:window.MB_code(),p_target:p.id});showDeleted('✅ '+p.name+' 계정을 복구했어요.')}
+      catch(e){m.textContent=errT(e);ok.disabled=false}});
+    row.append(btn('뒤로',()=>showDeleted()),ok);
+  }
+  function giftForm(p,amt){
+    head('💰 재산 주기');box.append(el('div','opm',(p.emoji||'🙂')+' '+p.name+' 에게'));
+    const a=el('input');a.type='text';a.placeholder='금액 (예: 1000000 또는 1e30)';a.value=amt||'';a.autocomplete='off';
+    const n=el('input');n.type='text';n.placeholder='하고 싶은 말 (없어도 돼요)';n.value=note;n.maxLength=100;
+    const m=el('div','opm');
+    box.append(a,n,m,el('div','row'));
+    box.lastChild.append(btn('뒤로',()=>showList()),btn('다음',()=>{const v=a.value.trim().toLowerCase();note=n.value.trim();
+      if(!/^[0-9]{1,15}(\.[0-9]{1,6})?(e[0-9]{1,4})?$/.test(v)||!(Number(v)>0||/e/.test(v))){m.textContent='금액은 숫자나 1e30처럼 써 주세요';return}
+      giftConfirm(p,v)}));
+  }
+  function giftConfirm(p,v){
+    head('💰 확인');let t='';try{t=fmt(money(v))}catch(e){t=v}
+    box.append(el('div','opm',p.name+' 에게 '+t+'원을 보낼까요?'+(note?'\n"'+note+'"':'')+'\n보내면 되돌릴 수 없고, 상대에게 알림이 가요.'));
+    const m=el('div','opm');const row=el('div','row');box.append(m,row);
+    const ok=btn('✅ 확인, 보내기',async()=>{ok.disabled=true;m.textContent='보내는 중…';
+      try{await rpc('admin_gift_money',{p_key:ls('mb-owner-key'),p_code:window.MB_code(),p_target:p.id,p_amount:v,p_note:note});note='';showList('✅ '+p.name+' 에게 '+t+'원을 보냈어요. 상대가 게임을 켜면 알림이 떠요.')}
+      catch(e){m.textContent=errT(e);ok.disabled=false}});
+    row.append(btn('뒤로',()=>giftForm(p,v)),ok);
+  }
+  function delConfirm(p){
+    head('🗑️ 계정 삭제');box.append(el('div','opm',(p.emoji||'🙂')+' '+p.name+' 계정을 지울까요?\n순위에서 사라지고 상대 게임에서도 이 계정이 지워져요.\n서버에 30일 동안 보관돼서, 그 안에는 \'삭제된 계정\'에서 복구할 수 있어요. 30일이 지나면 완전히 지워져요.'));
+    const n=el('input');n.type='text';n.placeholder='이유 (상대에게 보여요, 없어도 돼요)';n.maxLength=100;
+    const m=el('div','opm');const row=el('div','row');box.append(n,m,row);
+    const ok=btn('✅ 확인, 삭제',async()=>{ok.disabled=true;m.textContent='지우는 중…';
+      try{await rpc('admin_delete_player',{p_key:ls('mb-owner-key'),p_code:window.MB_code(),p_target:p.id,p_note:n.value.trim()});showList('✅ '+p.name+' 계정을 지웠어요. 상대가 게임을 켜면 알림이 떠요.')}
+      catch(e){m.textContent=errT(e);ok.disabled=false}});
+    row.append(btn('뒤로',()=>showList()),ok);
+  }
+  window.OPAPP={open(){if(!isOp()){return}root.hidden=false;note='';showList()}};
+
+  /* 받는 쪽: 20초마다 알림 확인. 먼저 '받았어요'를 서버에 알리고 나서 적용해요 (재산이 두 번 들어가지 않게) */
+  let busy=false;
+  async function poll(){
+    if(busy)return;const code=window.MB_code&&window.MB_code(),tok=ls('mb-dev-tok'),uid=ls('mb-dev-uid');if(!code||!tok||!uid)return;busy=true;
+    try{
+      const rows=await rpc('get_notices',{p_token:tok,p_code:code})||[];
+      if(rows.length){
+        await rpc('ack_notices',{p_token:tok,p_code:code,p_ids:rows.map(n=>n.id)});
+        const lines=[];
+        for(const n of rows){
+          if(String(n.target).indexOf(uid+'_')!==0)continue;
+          const aid=String(n.target).slice(uid.length+1),acc=(window.ACC.list()||[]).find(x=>x.id===aid);
+          if(n.kind==='gift'){const v=money(n.amount);S.money=Big.add(S.money,v);S.total=Big.add(S.total,v);try{clampMoney();save();render()}catch(e){}
+            lines.push('🎁 운영자가 '+(acc?acc.name+' 계정에 ':'')+fmt(v)+'원을 보냈어요!'+(n.note?'\n'+n.note:''))}
+          else if(n.kind==='delete'){const nm=acc?acc.name:'계정';if(acc)window.ACC.remove(aid);
+            lines.push('🗑️ 운영자가 "'+nm+'" 계정을 삭제했어요. 순위에서 사라졌어요.'+(n.note?'\n'+n.note:''))}
+          else if(n.kind==='restore'){let inf={};try{inf=JSON.parse(n.info||'{}')}catch(e){}
+            const back=!acc&&window.ACC.add({id:aid,name:inf.name,emoji:inf.emoji,color:inf.color});
+            lines.push('♻️ 운영자가 "'+(inf.name||'계정')+'" 계정을 복구했어요.'+(back?'':'')+'')}
+        }
+        if(lines.length)notify(lines);
+      }
+    }catch(e){}
+    busy=false;
+  }
+  setInterval(poll,20000);setTimeout(poll,6000);window.addEventListener('acc-change',()=>setTimeout(poll,1500));
+
+  /* 설정 > 계정: 운영자 계정에서만 앱 설치·열기 버튼이 보여요 */
+  function paintSet(){
+    const sacc=$('sacc');if(!sacc)return;let b=$('sop');
+    if(!isOp()){if(b)b.remove();return}
+    if(!b){b=el('div','acc-row');b.id='sop';sacc.appendChild(b)}
+    const k=inst?'1':'0';if(b.dataset.k===k&&b.childElementCount)return;b.dataset.k=k;b.textContent='';
+    if(!inst)b.append(btn('🛠️ 운영자 앱 설치',()=>{inst=true;try{localStorage.setItem(IK,'1')}catch(e){}paintSet()}));
+    else b.append(btn('🛠️ 운영자 앱 열기',()=>window.OPAPP.open()),btn('앱 삭제',()=>{inst=false;try{localStorage.removeItem(IK)}catch(e){}paintSet()}));
+  }
+  setInterval(paintSet,1000);
 })();
 
 /* ---------- 업데이트 보기: iPhone·기본 모드에서도. 설정 > 업데이트, iPhone 앱 보관함에서 열어요 ---------- */
@@ -6395,16 +6585,22 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     const L=window.UPDATES_LIST||[];
     const row=u=>'<div class="um-r"'+(L.indexOf(u)>=20?' style="opacity:.5"':'')+'><div class="um-i">'+(u.s==='done'?'✅':'🔔')+'</div><div><div class="um-t"><span>'+esc(u.t)+'</span><small>'+(u.s==='done'?esc(u.d):'예정')+'</small></div><p>'+esc(u.x)+'</p></div></div>';
     const soon=L.filter(u=>u.s==='soon'),done=L.filter(u=>u.s==='done');
-    document.getElementById('um-l').innerHTML=(soon.length?'<h4>업데이트 예정</h4>'+soon.map(row).join(''):'')+(done.length?'<h4>업데이트됨</h4>'+done.map(row).join(''):'')||'<p>아직 없어요.</p>';
+    const ht=(soon.length?'<h4>업데이트 예정</h4>'+soon.map(row).join(''):'')+(done.length?'<h4>업데이트됨</h4>'+done.map(row).join(''):'')||'<p>아직 없어요.</p>';
+    document.getElementById('um-l').innerHTML=ht;{const q=document.getElementById('l-up');if(q)q.innerHTML='<div id="upm2">'+ht+'</div>'}
     try{localStorage.setItem('mb-up-seen',String(L.reduce((m,u)=>u.s==='done'?Math.max(m,u.id):m,0)))}catch(e){}
   }
   window.openUpdates=function(){fill();root.hidden=false};
+  /* iPhone 모드: 업데이트도 홈에서 다른 앱(탭)처럼 자기 화면(l-up)으로 열려요 */
+  window.upTab=t=>{if(t==='up')fill()};
+  css.textContent+='#upm2 h4{margin:12px 0 4px}#upm2 .um-r{display:flex;gap:10px;padding:10px;margin-top:8px;border:1px solid var(--line,#ccc);border-radius:14px}#upm2 .um-i{font-size:22px;line-height:1.1}#upm2 .um-t{display:flex;justify-content:space-between;gap:8px;font-weight:700}#upm2 .um-t small{font-weight:400;color:var(--sub,#666)}#upm2 p{margin:4px 0 0;font-size:14px}';
+  const upSync=()=>{const b=document.querySelector('.tabs button[data-t="up"]');if(!b)return;const off=!document.body.classList.contains('phoneos');if(b.hidden!==off)b.hidden=off};
+  upSync();setInterval(upSync,150);
   root.addEventListener('click',e=>{if(e.target===root||e.target.id==='um-x')root.hidden=true});
   document.addEventListener('click',e=>{if(e.target&&e.target.id==='supd-b')window.openUpdates()});
 
   // iPhone 모드: 홈 화면의 ⚙️ 설정 옆에 🔔 업데이트 앱이 있어요 (parts/99 의 홈 화면 코드). 안 본 업데이트가 있으면 빨간 점
   const ics=document.createElement('style');
-  ics.textContent='#hmv .ha[data-t="_up"] i{position:relative}body.upnew #hmv .ha[data-t="_up"] i::after{content:"";position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;background:#e5484d;border:2px solid #fff}';
+  ics.textContent='#hmv .ha[data-t="up"] i{position:relative}body.upnew #hmv .ha[data-t="up"] i::after{content:"";position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;background:#e5484d;border:2px solid #fff}';
   document.head.appendChild(ics);
   // 새 업데이트가 있으면 빨간 점, 설정의 업데이트 칸은 기본 모드에서만
   function sync(){
@@ -6479,7 +6675,7 @@ body.phoneos{background-image:var(--hb-bg,none);background-attachment:fixed}
 #hmv .hg{overflow:visible;margin-top:calc(env(safe-area-inset-top,0px) + 30px)}#hmv .hcl{display:flex;justify-content:center;align-items:flex-start;min-height:92px}#hmv .hd .hcl{min-height:0;flex:1}
 #hmv .hgh{outline:2px dashed rgba(255,255,255,.75);outline-offset:-2px;border-radius:16px}
 #hmv .hd{display:flex;justify-content:space-around;padding:12px 6px;border-radius:30px;background:rgba(255,255,255,.18);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}#hmv .hd .ha span{display:none}
-body:not(.phoneos) .tabs button[data-t="wl"]{display:none}
+body:not(.phoneos) .tabs button[data-t="wl"],body:not(.phoneos) .tabs button[data-t="cm"],body:not(.phoneos) .tabs button[data-t="up"]{display:none}
 body.phoneos .tabs{display:none}
 #hbz{position:fixed;left:0;right:0;bottom:0;height:calc(env(safe-area-inset-bottom,0px) + 34px);z-index:99994;touch-action:none;background:transparent}#hbz[hidden]{display:none}
 body.phoneos #hmv{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 54px)}
@@ -6494,7 +6690,7 @@ body.phoneos #hmv{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 54px)}
 #hmv .hfx{position:absolute;top:-6px;left:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font:700 13px/22px system-ui;text-align:center;text-decoration:none}
 #hmv.edit .hfo .ha i{animation:jg .2s infinite alternate}
 </style><script>
-(()=>{const IC={btn:'🔘',ws:'🥈',wg:'🥇',m:'✖️',p:'⏱️',sq:'²',fa:'❗',ck:'🐣',reb:'♻️',prest:'🏅',awake:'✨',wl:'💰'};
+(()=>{const IC={btn:'🔘',ws:'🥈',wg:'🥇',m:'✖️',p:'⏱️',sq:'²',fa:'❗',ck:'🐣',reb:'♻️',prest:'🏅',awake:'✨',wl:'💰',cm:'🏆',up:'🔔'};
 let rec=[],v=null,retHome=0,hadHome=1,wasLk=null,fwdT=null;
 const touch=t=>{rec=rec.filter(x=>x!==t);rec.unshift(t);if(rec.length>8)rec.length=8;fwdT=null};   /* 열려 있는(실행 중인) 앱 목록 */
 const hb=document.createElement('div');hb.id='hbar';hb.hidden=true;document.body.appendChild(hb);
@@ -6578,10 +6774,11 @@ function openHome(live,ed){if(h||v||!document.body.classList.contains('phoneos')
   const inF={};
   const calcF=()=>{Object.keys(inF).forEach(k=>delete inF[k]);Object.keys(F).forEach(id=>{const f=F[id];f.a=(Array.isArray(f.a)?f.a:[]).filter(t=>tabs.some(x=>x.t===t)&&!inF[t]&&(inF[t]=id))})};
   calcF();Object.keys(F).forEach(id=>{if(F[id].a.length<2)delete F[id]});calcF();
-  const items=tabs.filter(x=>!inF[x.t]);items.push({t:'_set',ic:'⚙️',nm:'설정'});items.push({t:'_up',ic:'🔔',nm:'업데이트'});if(window.cmVisible&&window.cmVisible())items.push({t:'_cm',ic:'🏆',nm:'커뮤니티'});
+  const items=tabs.filter(x=>!inF[x.t]);items.push({t:'_set',ic:'⚙️',nm:'설정'});
   Object.keys(F).forEach(id=>items.push({t:'F'+id,folder:id,nm:F[id].n||'폴더',ic:'<em class="hfi">'+F[id].a.slice(0,4).map(t=>'<s>'+(IC[t]||'📱')+'</s>').join('')+'</em>'}));
   const GN=16,N=20;let pos={};try{pos=JSON.parse(localStorage.getItem('hmPos')||'{}')||{}}catch(_){pos={}}
   Object.keys(inF).forEach(t=>delete pos[t]);
+  if(pos._cm!==undefined&&pos.cm===undefined)pos.cm=pos._cm;delete pos._cm;if(pos._up!==undefined&&pos.up===undefined)pos.up=pos._up;delete pos._up;   /* 예전 커뮤니티 아이콘 자리를 이어받아요 */
   const used={};items.forEach(it=>{const c=pos[it.t];if(Number.isInteger(c)&&c>=0&&c<N&&!used[c])used[c]=it.t;else delete pos[it.t]});
   ['btn','wl','prest','reb'].forEach((t,i)=>{if(items.some(it=>it.t===t)&&pos[t]===undefined&&!used[GN+i]){pos[t]=GN+i;used[GN+i]=t}});
   items.forEach(it=>{if(pos[it.t]===undefined){let c=0;while(c<GN&&used[c])c++;if(c>=GN){c=GN;while(c<N&&used[c])c++}if(c<N){pos[it.t]=c;used[c]=it.t}}});
@@ -6594,7 +6791,7 @@ function openHome(live,ed){if(h||v||!document.body.classList.contains('phoneos')
       e.style.transition='opacity .3s .1s,transform .4s';e.style.opacity='0';e.style.transform='scale(1.12)';
       setTimeout(()=>{if(h===e)closeHome(1);if(cd===c){c.remove();cd=null}},440)}
     else closeHome()};
-  const tapOpen=(it,el)=>{if(it.folder){openFold(it.folder);return}if(h.classList.contains('edit'))return;if(it.t==='_up'){closeHome();if(window.openUpdates)window.openUpdates();return}if(it.t==='_cm'){closeHome();if(window.COMM)window.COMM.open();return}if(it.t==='_set'){closeHome();const a=document.getElementById('sapp');if(a)['pointerdown','pointerup','click'].forEach(k=>a.dispatchEvent(new PointerEvent(k,{bubbles:true,pointerId:1,isPrimary:true})))}else go(it.b,el)};
+  const tapOpen=(it,el)=>{if(it.folder){openFold(it.folder);return}if(h.classList.contains('edit'))return;if(it.t==='_set'){closeHome();const a=document.getElementById('sapp');if(a)['pointerdown','pointerup','click'].forEach(k=>a.dispatchEvent(new PointerEvent(k,{bubbles:true,pointerId:1,isPrimary:true})))}else go(it.b,el)};
   const freeCell=()=>{const u={};Object.values(pos).forEach(c=>u[c]=1);for(let c=0;c<N;c++)if(!u[c])return c;return -1};
   const openFold=id=>{const f=F[id];if(!f)return;const o=document.createElement('div');o.className='hfo';const ed3=h.classList.contains('edit');
     o.innerHTML='<div class="hfp"><input class="hfn" maxlength="12"><div class="hfg"></div></div>';
@@ -6880,11 +7077,22 @@ window.GF=GF;
 (function(){
   var LS=null;try{LS=window.localStorage}catch(_){}
   if(!LS)return;
-  var SKIP={'mb-dev-code':1,'mb-owner-key':1,'mb-bk-pass':1,'mb-bk-name':1,'mb-lnk-x':1};
+  var SKIP={'mb-dev-code':1,'mb-owner-key':1,'mb-bk-pass':1,'mb-bk-name':1,'mb-bk-off':1,'mb-lnk-x':1};
   var GK=['money-buttons-v10-disc-normal','money-buttons-v10-disc-ultra-normal','money-buttons-v10-disc-test-p50'];
   var rawSet=Storage.prototype.setItem,rawRem=Storage.prototype.removeItem;
   var MSG={bad_code:'초대 코드가 맞지 않아요. 커뮤니티 앱에서 코드를 먼저 입력해 주세요.',bad_pass:'이름이나 비밀번호가 맞지 않아요.',locked:'비밀번호를 여러 번 틀려서 잠시 잠겼어요. 10분 뒤에 다시 해 주세요.',bad_name:'이름은 1~24자로 해 주세요.',bad_pass_format:'비밀번호는 6자 이상으로 해 주세요.',too_big:'저장할 데이터가 너무 커요.',full:'서버가 가득 차서 새 백업을 만들 수 없어요.',rate:'방금 저장해서 잠시 뒤에 다시 눌러 주세요.',bad_data:'저장할 수 없는 데이터예요.',error:'서버에 연결하지 못했어요. 잠시 뒤에 다시 해 주세요.'};
   var last='',lastOk=0,busy=false;
+  /* 저장·불러오기 알림: 화면 위에 잠깐 떠요. gap(ms) 안에는 같은 종류를 다시 띄우지 않아요 */
+  var tstAt={};
+  function toast(kind,text,gap){
+    try{var now=Date.now();if(gap&&tstAt[kind]&&now-tstAt[kind]<gap)return;tstAt[kind]=now;
+      var t=document.createElement('div');t.textContent=text;
+      t.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);max-width:88vw;padding:10px 16px;border-radius:14px;background:rgba(30,30,30,.92);color:#fff;font-size:14px;z-index:2147483000;box-shadow:0 4px 16px rgba(0,0,0,.3);pointer-events:none;opacity:0;transition:opacity .25s';
+      document.body.appendChild(t);
+      requestAnimationFrame(function(){t.style.opacity='1'});
+      setTimeout(function(){t.style.opacity='0';setTimeout(function(){try{t.remove()}catch(_){}},300)},2600);
+    }catch(_){}
+  }
   function snap(){
     var o={},tot=0;
     for(var i=0;i<LS.length;i++){var k=LS.key(i);if(k==null||SKIP[k])continue;var v=LS.getItem(k);if(typeof v!=='string'||v.length>240000)continue;o[k]=v;tot+=k.length+v.length}
@@ -6892,17 +7100,40 @@ window.GF=GF;
   }
   function sc(ls){var m=-1;if(!ls)return m;GK.forEach(function(k){try{var o=JSON.parse(ls[k]||'null');if(o){var x=(+o.prest||0)*1e6+(+o.rebTotal||+o.reb||0);if(x>m)m=x}}catch(_){}});return m}
   function creds(){var n=null,p=null;try{n=LS.getItem('mb-bk-name');p=LS.getItem('mb-bk-pass')}catch(_){}return n&&p?{n:n,p:p}:null}
+  /* 비밀번호 없이 자동: 계정 이름으로 정한 열쇠를 써요 (이름과 초대 코드를 아는 사람은 열 수 있어요) */
+  var dead=false;
+  function dpass(n){return 'auto-'+String(n).normalize('NFC').trim().toLowerCase()+'-money'}
+  function autoInit(){
+    try{if(dead||creds()||LS.getItem('mb-bk-off')==='1')return;
+      var me=window.ACC&&window.ACC.me&&window.ACC.me();if(!me||!ready())return;
+      rawSet.call(LS,'mb-bk-name',me.name);rawSet.call(LS,'mb-bk-pass',dpass(me.name));guarded=false}catch(_){}
+  }
   function ready(){return !!(window.MB_rpc&&window.MB_code&&window.MB_code())}
+  var paused=false,guarded=false;
+  /* 자동 백업이 서버의 더 앞선 진행을 덮어쓰지 않게, 켜진 뒤 처음 한 번은 서버와 비교해요 */
+  async function guard(c){
+    if(guarded)return true;
+    try{var r=await window.MB_rpc('backup_load',{p_name:c.n,p_pass:c.p,p_code:window.MB_code()});
+      if(!r)return false;
+      if(r.s==='ok'){var o0=snap(),a=sc(r.data&&r.data.ls),b=sc(o0&&o0.ls);
+        if(a>b){busy=true;var yes=confirm('서버에 이 기기보다 더 앞선 진행이 있어요.\n서버 것을 불러올까요?\n(취소하면 이번에는 자동 백업을 쉬어요)');busy=false;
+          if(yes){restore(c.n,c.p);return false}
+          paused=true;return false}}
+      else if(r.s==='bad_pass'||r.s==='locked'){return true}
+      guarded=true;return true}
+    catch(e){return false}
+  }
   async function push(){
-    var c=creds();if(!c||busy||!ready())return 'skip';
+    autoInit();var c=creds();if(!c||busy||paused||!ready())return 'skip';
+    if(!guarded&&!(await guard(c)))return 'skip';
     var o=snap();if(!o)return 'too_big';
     var key=JSON.stringify(o.ls);if(key===last)return 'same';
     busy=true;
     try{var s=await window.MB_rpc('backup_save',{p_name:c.n,p_pass:c.p,p_code:window.MB_code(),p_data:o});
-      if(s==='ok'){last=key;lastOk=Date.now()}
-      else if(s==='bad_pass'||s==='locked'){try{rawRem.call(LS,'mb-bk-pass')}catch(_){}}   // 비밀번호가 바뀌었으면 자동 저장을 멈춰요
+      if(s==='ok'){last=key;lastOk=Date.now();toast('save','☁️ 서버에 저장됐어요',300000)}
+      else if(s==='bad_pass'||s==='locked'){dead=true;try{rawRem.call(LS,'mb-bk-pass')}catch(_){}}   // 비밀번호가 바뀌었으면 자동 저장을 멈춰요
       return s}
-    catch(e){return 'error'}finally{busy=false}
+    catch(e){toast('fail','☁️ 서버에 저장하지 못했어요. 잠시 뒤 다시 해요',600000);return 'error'}finally{busy=false}
   }
   async function restore(n,p){
     var r=await window.MB_rpc('backup_load',{p_name:n,p_pass:p,p_code:window.MB_code()});
@@ -6913,31 +7144,32 @@ window.GF=GF;
     del.forEach(function(k){try{rawRem.call(LS,k)}catch(_){}});
     Object.keys(ls).forEach(function(k){if(SKIP[k])return;try{rawSet.call(LS,k,ls[k])}catch(_){}});
     try{rawSet.call(LS,'mb-bk-name',n);rawSet.call(LS,'mb-bk-pass',p)}catch(_){}
+    try{rawSet.call(window.sessionStorage,'mb-bk-loaded','1')}catch(_){}
     location.reload();return 'ok';
   }
   function el(tag,css,txt){var e=document.createElement(tag);if(css)e.style.cssText=css;if(txt!=null)e.textContent=txt;return e}
   function build(host){
     var box=el('div','margin-top:14px;padding-top:10px;border-top:1px solid var(--line,#ccc)');box.id='sbk';
-    var h=el('h4','margin:0 0 4px','☁️ 서버에 저장·불러오기');
-    var info=el('small','display:block;margin-bottom:8px;opacity:.8','브라우저 기록을 지워도 이름과 비밀번호로 진행과 계정을 되찾을 수 있어요. 비밀번호를 잊으면 찾을 수 없어요. 한 번에 한 기기에서만 이어서 해 주세요.');
+    var h=el('h4','margin:0 0 4px','☁️ 자동 백업');
+    var info=el('small','display:block;margin-bottom:8px;opacity:.8','계정을 만들고 초대 코드를 넣으면 진행, 계정, 설정이 서버에 자동으로 백업돼요. 따로 할 일은 없어요. 브라우저 기록을 지웠다면 계정 이름을 넣고 불러오기를 눌러 주세요. 한 번에 한 기기에서만 이어서 해 주세요.');
     var inCss='width:100%;box-sizing:border-box;padding:10px;margin:4px 0;border-radius:10px;border:1px solid var(--line,#ccc);font-size:16px;background:var(--card,#fff);color:inherit';
-    var nm=el('input',inCss);nm.type='text';nm.placeholder='백업 이름';nm.autocomplete='off';
-    var pw=el('input',inCss);pw.type='password';pw.placeholder='비밀번호 (6자 이상)';pw.autocomplete='off';
+    var nm=el('input',inCss);nm.type='text';nm.placeholder='계정 이름';nm.autocomplete='off';
+    var pw=el('input',inCss);pw.type='password';pw.placeholder='예전에 비밀번호를 정했다면 여기에';pw.autocomplete='off';
     var row=el('div','display:flex;gap:8px;flex-wrap:wrap;margin-top:6px');
-    var bs=el('button',null,'저장하기'),bl=el('button',null,'불러오기'),bu=el('button',null,'연결 끊기');
+    var bs=el('button',null,'지금 백업'),bl=el('button',null,'불러오기'),bu=el('button',null,'자동 백업 끄기'),bo=null;
     [bs,bl,bu].forEach(function(b){b.type='button'});
     var st=el('small','display:block;margin-top:8px'),msg=el('small','display:block;margin-top:6px;color:var(--sub,#666)');
     row.append(bs,bl,bu);box.append(h,info,nm,pw,row,st,msg);host.appendChild(box);
     function say(t){msg.textContent=t||''}
     function lock(x){bs.disabled=bl.disabled=x}
     function refresh(){
-      var c=creds();bu.hidden=!c;
+      var c=creds();bu.hidden=!c;bs.textContent=LS.getItem('mb-bk-off')==='1'?'자동 백업 켜기':'지금 백업';
       if(c){nm.value=nm.value||c.n;var m=lastOk?Math.max(0,Math.round((Date.now()-lastOk)/60000)):null;
-        st.textContent='연결됨: '+c.n+(m===null?'':' · 마지막 저장 '+(m<1?'방금':m+'분 전'))+' · 자동으로 저장돼요'}
-      else{var me=window.ACC&&window.ACC.me&&window.ACC.me();if(me&&!nm.value)nm.value=me.name;st.textContent='아직 저장하지 않았어요'}
+        st.textContent='연결됨: '+c.n+(m===null?'':' · 마지막 저장 '+(m<1?'방금':m+'분 전'))+' · 진행·계정·설정을 자동으로 백업해요'}
+      else{var me=window.ACC&&window.ACC.me&&window.ACC.me();if(me&&!nm.value)nm.value=me.name;st.textContent=LS.getItem('mb-bk-off')==='1'?'자동 백업이 꺼져 있어요':!me?'계정을 만들면 자동으로 백업돼요':!ready()?'커뮤니티에서 초대 코드를 넣으면 자동으로 백업돼요':dead?'이전에 비밀번호로 저장한 이름이에요. 비밀번호를 넣고 지금 백업을 눌러 주세요':'곧 자동으로 백업돼요'}
     }
     bs.onclick=async function(){
-      var n=nm.value.trim(),p=pw.value;if(!n||!p){say('이름과 비밀번호를 넣어 주세요');return}
+      var n=nm.value.trim(),p=pw.value||dpass(n);if(!n){say('계정 이름을 넣어 주세요');return}
       if(!ready()){say(MSG.bad_code);return}
       lock(true);say('확인 중…');
       try{
@@ -6949,25 +7181,32 @@ window.GF=GF;
         }
         var o=snap();if(!o){say(MSG.too_big);return}
         var s=await window.MB_rpc('backup_save',{p_name:n,p_pass:p,p_code:window.MB_code(),p_data:o});
-        if(s==='ok'){try{LS.setItem('mb-bk-name',n);LS.setItem('mb-bk-pass',p)}catch(_){}last=JSON.stringify(o.ls);lastOk=Date.now();pw.value='';say('저장했어요. 이제 자동으로 저장돼요.')}
+        if(s==='ok'){try{LS.setItem('mb-bk-name',n);LS.setItem('mb-bk-pass',p)}catch(_){}last=JSON.stringify(o.ls);lastOk=Date.now();guarded=true;paused=false;dead=false;try{rawRem.call(LS,'mb-bk-off')}catch(_){}pw.value='';say('백업했어요. 앞으로도 알아서 저장돼요.');toast('save','☁️ 서버에 저장됐어요')}
         else say(MSG[s]||MSG.error);
       }catch(e){say(MSG.error)}finally{lock(false);refresh()}
     };
     bl.onclick=async function(){
-      var n=nm.value.trim(),p=pw.value;if(!n||!p){say('이름과 비밀번호를 넣어 주세요');return}
+      var n=nm.value.trim(),p=pw.value||dpass(n);if(!n){say('계정 이름을 넣어 주세요');return}
       if(!ready()){say(MSG.bad_code);return}
-      if(!confirm('이 기기의 진행과 계정을 서버에 저장된 것으로 바꿔요.\n계속할까요?'))return;
+      if(!confirm('이 기기의 진행, 계정, 설정을 서버에 저장된 것으로 바꿔요.\n계속할까요?'))return;
       lock(true);say('불러오는 중…');
       try{var r=await restore(n,p);if(r!=='ok')say(MSG[r]||MSG.error)}catch(e){say(MSG.error)}finally{lock(false)}
     };
-    bu.onclick=function(){try{rawRem.call(LS,'mb-bk-pass');rawRem.call(LS,'mb-bk-name')}catch(_){}last='';lastOk=0;say('연결을 끊었어요. 서버에 저장된 건 그대로 있어요.');refresh()};
+    bu.onclick=function(){try{rawRem.call(LS,'mb-bk-pass');rawRem.call(LS,'mb-bk-name');rawSet.call(LS,'mb-bk-off','1')}catch(_){}last='';lastOk=0;guarded=false;paused=false;say('자동 백업을 껐어요. 서버에 저장된 건 그대로 있어요.');refresh()};
     refresh();setInterval(refresh,15000);
   }
   (function wait(){var h=document.getElementById('scomm');if(h&&h.parentNode&&!document.getElementById('sbk'))build(h.parentNode);else setTimeout(wait,500)})();
   setInterval(push,20000);
+  /* 설정을 바꾸면(게임 진행 저장은 빼고) 잠시 뒤 바로 백업해요 */
+  (function(){var tm=0,prev=Storage.prototype.setItem;
+    Storage.prototype.setItem=function(k,v){var r=prev.apply(this,arguments);
+      try{if(this===LS&&typeof k==='string'&&k.indexOf('money-buttons-v10')!==0&&!SKIP[k]){clearTimeout(tm);tm=setTimeout(push,6000)}}catch(_){}
+      return r};})();
   document.addEventListener('visibilitychange',function(){if(document.hidden)push()});
   window.addEventListener('pagehide',push);
   setTimeout(push,4000);
+  /* 불러오기 뒤 새로고침되면 한 번 알려줘요 */
+  try{var ss=window.sessionStorage;if(ss&&ss.getItem('mb-bk-loaded')==='1'){rawRem.call(ss,'mb-bk-loaded');tstAt.save=Date.now();setTimeout(function(){toast('load','☁️ 서버에서 진행 상황을 불러왔어요')},600)}}catch(_){}
 })();
 </script>
 <script>
