@@ -554,7 +554,18 @@ const $=id=>document.getElementById(id);
 /* 게임 모드: 일반(처음부터, 기본) / 테스트(명성 50으로 시작). 설정에서 고르고, 모드마다 저장이 따로예요. */
 const MODE_KEY='money-button-game-mode';
 let GMODE=(()=>{try{const v=localStorage.getItem(MODE_KEY);return v==='test'||v==='ultra'?v:'normal'}catch(e){return 'normal'}})();
-const gKey=m=>m==='normal'?'money-buttons-v10-disc-normal':m==='ultra'?'money-buttons-v10-disc-ultra-normal':'money-buttons-v10-disc-test-p50';
+/* 계정마다 저장이 따로예요: 저장 이름 뒤에 @계정번호가 붙어요. 계정이 하나도 없으면 예전 이름 그대로 써요. */
+const accIdNow=()=>{try{let l=JSON.parse(localStorage.getItem('acc-list-v1')||'[]');if(!Array.isArray(l))l=[];l=l.filter(a=>a&&a.id&&a.name);const c=localStorage.getItem('acc-cur-v1');return l.some(a=>a.id===c)?c:(l[0]?l[0].id:'')}catch(e){return ''}};
+let ACC_ID=accIdNow();
+const gBase=m=>m==='normal'?'money-buttons-v10-disc-normal':m==='ultra'?'money-buttons-v10-disc-ultra-normal':'money-buttons-v10-disc-test-p50';
+const gKey=m=>gBase(m)+(ACC_ID?'@'+ACC_ID:'');
+/* 예전(계정 없이 저장한) 진행은 지금 계정 하나에만 옮겨요. 다른 계정은 처음부터 시작해요. */
+function migrateLegacy(){
+  if(!ACC_ID)return;
+  try{for(const m of ['normal','ultra','test']){const b=gBase(m),k=gKey(m),v=localStorage.getItem(b);
+    if(v!=null&&localStorage.getItem(k)==null){localStorage.setItem(k,v);localStorage.removeItem(b)}}}catch(e){}
+}
+migrateLegacy();
 let KEY=gKey(GMODE);
 window.GMODE=GMODE;
 window.setGameMode=function(m){
@@ -2373,6 +2384,7 @@ function render(){
   document.querySelectorAll('.trow').forEach(r=>{r.hidden=[...r.children].every(b=>b.hidden)});
   $('qty').hidden=prest<3||TAB!=='btn';
   document.querySelectorAll('.qty button').forEach((b,i)=>{
+    if(!BULK[i])return;   // 모아보기 카드처럼 복사된 버튼은 건너뛰어요
     const q=[BULK[i][0],pxAny(BULK[i][1])],lb=q[0]==='max'?'최대':q[0]+'번';
     set(b,i<=S.bulk?lb:i===S.bulk+1?`${lb}\n${fmt(q[1])}원`:`${lb}\n잠김`);
     b.classList.toggle('locked',i>S.bulk+1);
@@ -3878,6 +3890,24 @@ function mk(d){
 setInterval(()=>{for(const d of defs){try{mk(d);if(W[d.k])W[d.k]()}catch(_){}}},400);
 })();
 
+/* 계정을 바꾸면: 지금 계정 진행을 저장하고, 새 계정의 저장을 불러와요 (계정끼리 재산·진행은 섞이지 않아요) */
+window.addEventListener('acc-change',()=>{
+  const id=accIdNow();
+  if(id===ACC_ID)return;
+  try{save()}catch(e){}   // 아직 KEY가 옛 계정이라 옛 계정 칸에 저장돼요
+  ACC_ID=id;
+  migrateLegacy();   // 계정이 하나도 없다가 처음 만든 경우: 그동안 하던 진행을 그 계정이 받아요
+  KEY=gKey(GMODE);
+  for(const k of Object.keys(S))delete S[k];
+  Object.assign(S,fresh());
+  try{load()}catch(e){}
+  try{   // 지워진 계정의 저장은 정리해요
+    const l=JSON.parse(localStorage.getItem('acc-list-v1')||'[]'),ids=new Set((Array.isArray(l)?l:[]).map(a=>a&&a.id));
+    const del=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf('money-buttons-v10-disc')===0){const p=k.indexOf('@');if(p>0&&!ids.has(k.slice(p+1)))del.push(k)}}
+    del.forEach(k=>localStorage.removeItem(k));
+  }catch(e){}
+  try{if(typeof done==='function')done();else render()}catch(e){}
+});
 load();
 if(S.ts&&S.aw10){
   const dt=Math.min((Date.now()-S.ts)/1000,offlineCap());
@@ -4552,7 +4582,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     if(UI.mode!=='ipad'||UI.mac||wrapOff||mini.g){grip.hidden=true;return}
     const r=stage.getBoundingClientRect(),[bs,be]=gfull?[0,3]:(GEDGE[UI.ipp||'c']||GEDGE.c),cw=r.width/3;
     grip.hidden=false;
-    grip.style.left=(gfull||gside()==='R'?r.left+cw*be-66-GUP:r.left+cw*bs+2+GUP)+'px';   // 모서리에서 안쪽 위(대각선)로 띄워 애플 하단바(홈 표시)와 안 겹치게
+    grip.style.left=(gfull||gside()==='R'?r.left+ipd_dvX(be)-66-GUP:r.left+ipd_dvX(bs)+2+GUP)+'px';   // 모서리에서 안쪽 위(대각선)로 띄워 애플 하단바(홈 표시)와 안 겹치게
     grip.style.top=(r.bottom-36-GUP)+'px';
   }
   let gd=null;
@@ -4627,11 +4657,28 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
       const g=apg[k],el=slotEl(k);
       if(!slotApp(k)||el.hidden||mini[k]||gfull){g.hidden=true;return}
       const [a,b]=colOf(el);
-      g.hidden=false;g.style.left=(r.left+cw*(b-1)-66-GUP)+'px';g.style.top=(r.bottom-36-GUP)+'px';
+      g.hidden=false;g.style.left=(r.left+ipd_dvX(b-1)-66-GUP)+'px';g.style.top=(r.bottom-36-GUP)+'px';
     });
   }
+  /* 안전장치: 어떤 순서로 열고 닫고 늘렸든 칸에 붙은 창(버튼 창·앱 둘)이 서로 겹치지 않게 해요. 겹치면 더 오래 안 쓴 쪽이 앱 함으로(버튼 창은 닫힘) 들어가요 */
+  function tileGuard(){
+    try{
+      if(gfull||UI.mode!=='ipad')return;
+      let rc=[];try{rc=recent}catch(_){}
+      const ri=x=>{const i=rc.indexOf(x);return i<0?99:i};
+      const ents=()=>[['g',wrap,()=>!wrapOff],['1',app,()=>!!cur&&!mini[1]],['2',app2,()=>!!cur2&&!mini[2]]].filter(([k,el,on])=>on()&&!el.hidden&&el.style.gridColumn&&!el.classList.contains('wmini'));
+      for(let n=0;n<4;n++){
+        const es=ents();let hit=null;
+        for(let i=0;i<es.length&&!hit;i++)for(let j=i+1;j<es.length&&!hit;j++){const x=colOf(es[i][1]),y=colOf(es[j][1]);if(x[0]<y[1]&&y[0]<x[1])hit=[es[i],es[j]]}
+        if(!hit)break;
+        const lose=ri(hit[0][0])>=ri(hit[1][0])?hit[0]:hit[1];
+        if(lose[0]==='g'){wrapOff=1;UI.bo=1;wrap.hidden=true;ipSave()}
+        else{const k=+lose[0];stashApp(k);lose[1].hidden=true;lose[1].style.gridColumn=''}
+      }
+    }catch(_){}
+  }
   let pvC=null;   // layout 직전 화면에 있던 앱 칸·보관함의 가로 칸 (버튼 창을 닫아도 앱이 제자리에 있게)
-  function layout(){{pvC={1:app.style.gridColumn?colOf(app):null,2:app2.style.gridColumn?colOf(app2):null,lib:lib.hidden?null:colOf(lib)}}layout0();twoSync();appFit();libFill();if(cur==='_lib')fillLib(document.getElementById('ipbody'));if(cur2==='_lib')fillLib(document.getElementById('ipbody2'));gripPos();if(window.wmPost)wmPost();apGripPos()}
+  function layout(){{pvC={1:app.style.gridColumn?colOf(app):null,2:app2.style.gridColumn?colOf(app2):null,lib:lib.hidden?null:colOf(lib)}}layout0();twoSync();appFit();tileGuard();libFill();if(cur==='_lib')fillLib(document.getElementById('ipbody'));if(cur2==='_lib')fillLib(document.getElementById('ipbody2'));gripPos();if(window.wmPost)wmPost();if(window.ipd_dvSync)window.ipd_dvSync();apGripPos()}
   /* ---------- 창 틀 WM 저장소 (큰 공사 4단계): 창 상태 저장소를 WM 한 곳이 가져요. 칸 앱 이름(cur·cur2)은 코드 곳곳에서 직접 써서 그대로 두고, WM.slotT로만 읽어요 ---------- */
   const WM={wins:{},small:{1:null,2:null,g:null},stash:(UI.stash||[]).slice(0,8)};window.WM=WM;
   const stash=WM.stash;const stSave=()=>{UI.stash=stash.slice(0,8);ipSave()};let placeNew=0,wantCols=null;   // stash = 다른 앱에 가려져 앱 함으로 들어간 앱들
@@ -4826,7 +4873,8 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   [1,2,'g'].forEach(k=>{rz[k].className='wmrz';rz[k].hidden=true;document.body.appendChild(rz[k])});
   const slotEl=k=>k===1?app:app2,slotApp=k=>k===1?cur:cur2;
   const colOf=el=>{const m=/(\d+)\s*\/\s*(\d+)/.exec(el.style.gridColumn||'');return m?[+m[1],+m[2]]:[1,4]};
-  function paneBox(el){const r=stage.getBoundingClientRect(),cw=r.width/3,[a,b]=colOf(el);return{x:(a-1)*cw,w:(b-a)*cw,h:r.height}}
+  function ipd_dvX(i){const r=stage.getBoundingClientRect(),B=ipd_dvAp||[1,2];return r.width*[0,B[0],B[1],3][i]/3}   // i번째 칸 경계의 가로 위치 (세로선으로 비율을 바꿨으면 그 위치)
+  function paneBox(el){const r=stage.getBoundingClientRect(),[a,b]=colOf(el);return{x:ipd_dvX(a-1),w:ipd_dvX(b-1)-ipd_dvX(a-1),h:r.height}}
   /* 말랑한 움직임 도우미: ① 붙어서 커질 때(wmGrow) 작은 창 모양에서 스프링처럼 살짝 넘쳤다 자리 잡고, ② 끌 때(jlNudge)는 손가락보다 살짝 늦게 따라오며 진행 방향으로 말랑하게 늘어나고, 놓으면 출렁이며 멈춰요 */
   const wmSpring=(per,z,T)=>{try{if(!(CSS.supports&&CSS.supports('animation-timing-function','linear(0,1)')))return 'cubic-bezier(.2,1.25,.3,1)';const n=64,w=2*Math.PI/per,wd=w*Math.sqrt(1-z*z),s=[];for(let i=0;i<=n;i++){const q=T*i/n;s.push((1-Math.exp(-z*w*q)*(Math.cos(wd*q)+(z*w/wd)*Math.sin(wd*q))).toFixed(4))}s[n]='1';return 'linear('+s.join(',')+')'}catch(_){return 'cubic-bezier(.2,1.25,.3,1)'}};
   const WMGROW=wmSpring(.34,.88,.5);
@@ -5019,6 +5067,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   const rzPv=document.createElement('div');rzPv.id='rzpv';rzPv.hidden=true;document.body.appendChild(rzPv);
   const rzBd=document.createElement('div');rzBd.id='rzbd';rzBd.hidden=true;document.body.appendChild(rzBd);
   const rzCss=document.createElement('style');rzCss.textContent='#rzpv{position:fixed;z-index:99998;pointer-events:none;box-sizing:border-box;border:2px solid rgba(60,130,255,.95);background:rgba(60,130,255,.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font:700 32px/1 system-ui,-apple-system,sans-serif;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.5)}#rzbd{position:fixed;z-index:99999;pointer-events:none;transform:translateX(-50%);padding:5px 12px;border-radius:12px;background:rgba(0,0,0,.7);color:#fff;font:700 16px/1.2 system-ui,-apple-system,sans-serif;white-space:nowrap}#rzbd.on{background:rgba(60,130,255,1)}#rzpv[hidden],#rzbd[hidden]{display:none}';document.head.appendChild(rzCss);
+  const RZ_MINW=220,RZ_MINH=160;   // iPad 작은 창의 가장 작은 크기(자유 크기 조절)
   const RZ_SHOW=.21,RZ_MAG=.0675;   // 칸 크기 기준: .35칸 안이면 파란 칸을 보여 주고(놓으면 맞춰져요), .12칸 안이면 끌고 있어도 바로 착 붙어요
   function rzCalc(x,y,w,h){
     const sr=stage.getBoundingClientRect(),W=sr.width,H=sr.height;
@@ -5044,15 +5093,17 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     const h=rz[k];let d=null;
     h.addEventListener('pointerdown',e=>{const m=mini[k];if(!m)return;d={x:e.clientX,y:e.clientY,w:m.w,h:m.h};try{h.setPointerCapture(e.pointerId)}catch(_){}});
     h.addEventListener('pointermove',e=>{if(!d||!mini[k])return;const m=mini[k],pb=paneBox(slotEl(k)),sr=stage.getBoundingClientRect();
-      m.w=Math.max(pb.w*.4,Math.min(sr.width-m.x,d.w+e.clientX-d.x));m.h=Math.max(pb.h*.4,Math.min(sr.height-m.y,d.h+e.clientY-d.y));wmPlace(k);const a=rzCalc(m.x,m.y,m.w,m.h);if(a.d<=RZ_MAG){m.w=a.rect.w;m.h=a.rect.h;wmPlace(k)}rzShow(a,m.x,m.y,m.w)});
-    const rend=()=>{if(d&&mini[k]&&mini[k].w){const m=mini[k],a=rzCalc(m.x,m.y,m.w,m.h);if(a.d<=RZ_SHOW){m.x=a.rect.x;m.y=a.rect.y;m.w=a.rect.w;m.h=a.rect.h;wmPlace(k)}if(slotApp(k))lszSet(slotApp(k),m.w,m.h)}d=null;rzHide()};h.addEventListener('pointerup',rend);h.addEventListener('pointercancel',rend);
+      const fr=!(window.macOn&&window.macOn());   // iPad: Mac처럼 칸 자석 없이 오른쪽 아래로 원하는 크기까지 자유롭게
+      m.w=Math.max(fr?RZ_MINW:pb.w*.4,Math.min(sr.width-m.x,d.w+e.clientX-d.x));m.h=Math.max(fr?RZ_MINH:pb.h*.4,Math.min(sr.height-m.y,d.h+e.clientY-d.y));wmPlace(k);if(fr){rzHide();return}const a=rzCalc(m.x,m.y,m.w,m.h);if(a.d<=RZ_MAG){m.w=a.rect.w;m.h=a.rect.h;wmPlace(k)}rzShow(a,m.x,m.y,m.w)});
+    const rend=()=>{if(d&&mini[k]&&mini[k].w){const m=mini[k],fr=!(window.macOn&&window.macOn()),a=rzCalc(m.x,m.y,m.w,m.h);if(!fr&&a.d<=RZ_SHOW){m.x=a.rect.x;m.y=a.rect.y;m.w=a.rect.w;m.h=a.rect.h;wmPlace(k)}if(slotApp(k))lszSet(slotApp(k),m.w,m.h)}d=null;rzHide()};h.addEventListener('pointerup',rend);h.addEventListener('pointercancel',rend);
   });
   (()=>{   // 버튼 작은 창: 오른쪽 아래 모서리로 크기 조절 (칸의 40%까지)
     const h=rz.g;let d=null;
     h.addEventListener('pointerdown',e=>{const m=mini.g;if(!m)return;d={x:e.clientX,y:e.clientY,w:m.w,h:m.h};try{h.setPointerCapture(e.pointerId)}catch(_){}});
     h.addEventListener('pointermove',e=>{if(!d||!mini.g)return;const m=mini.g,pb=paneBox(wrap),sr=stage.getBoundingClientRect();
-      m.w=Math.max(pb.w*.4,Math.min(sr.width-m.x,d.w+e.clientX-d.x));m.h=Math.max(pb.h*.4,Math.min(sr.height-m.y-0,d.h+e.clientY-d.y));gPlace();const a=rzCalc(m.x,m.y-34,m.w,m.h+34);if(a.d<=RZ_MAG){m.w=a.rect.w;m.h=a.rect.h-34;gPlace()}rzShow(a,m.x,m.y-34,m.w)});
-    const rend=()=>{if(d&&mini.g&&mini.g.w){const m=mini.g,a=rzCalc(m.x,m.y-34,m.w,m.h+34);if(a.d<=RZ_SHOW){m.x=a.rect.x;m.y=a.rect.y+34;m.w=a.rect.w;m.h=a.rect.h-34;gPlace()}if(window.macOn&&window.macOn())window.macSnapG();lszSet('_btn',mini.g.w,mini.g.h)}d=null;rzHide()};h.addEventListener('pointerup',rend);h.addEventListener('pointercancel',rend);
+      const fr=!(window.macOn&&window.macOn());   // iPad: 칸 자석 없이 자유롭게
+      m.w=Math.max(fr?RZ_MINW:pb.w*.4,Math.min(sr.width-m.x,d.w+e.clientX-d.x));m.h=Math.max(fr?RZ_MINH:pb.h*.4,Math.min(sr.height-m.y-0,d.h+e.clientY-d.y));gPlace();if(fr){rzHide();return}const a=rzCalc(m.x,m.y-34,m.w,m.h+34);if(a.d<=RZ_MAG){m.w=a.rect.w;m.h=a.rect.h-34;gPlace()}rzShow(a,m.x,m.y-34,m.w)});
+    const rend=()=>{if(d&&mini.g&&mini.g.w){const m=mini.g,fr=!(window.macOn&&window.macOn()),a=rzCalc(m.x,m.y-34,m.w,m.h+34);if(!fr&&a.d<=RZ_SHOW){m.x=a.rect.x;m.y=a.rect.y+34;m.w=a.rect.w;m.h=a.rect.h-34;gPlace()}if(window.macOn&&window.macOn())window.macSnapG();lszSet('_btn',mini.g.w,mini.g.h)}d=null;rzHide()};h.addEventListener('pointerup',rend);h.addEventListener('pointercancel',rend);
   })();
   setInterval(()=>{sbTick();wmBarSync()},1000);window.addEventListener('ubchg',()=>{try{wmBarSync()}catch(_){}});   // 봇 설정을 바꾸면 위 막대도 바로 바꿔요
 
@@ -5149,6 +5200,56 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   };
   hdl.addEventListener('pointerup',swUp);hdl.addEventListener('pointercancel',swUp);
   const _wb=window.wmBar;window.wmBar=st=>{_wb(st);hdl.hidden=sb.hidden;if(sb.hidden&&ovState)ovShow(0)};
+  /* ---------- iPad: 맞닿은 두 칸(앱·버튼 창·보관함) 사이의 세로선을 끌어 비율을 자유롭게 바꿔요 (Mac의 Split View처럼). 칸 경계가 1:2·2:2에 가까우면 착 붙어요 ---------- */
+  const ipdvI=document.createElement('div');ipdvI.id='ipdv';document.body.appendChild(ipdvI);
+  const ipdvCss=document.createElement('style');ipdvCss.textContent='#ipdv{position:fixed;left:0;top:0;width:0;height:0;z-index:3}#ipdv i{position:fixed;display:block;width:24px;margin-left:-12px;cursor:col-resize;touch-action:none;-webkit-tap-highlight-color:transparent}#ipdv i::after{content:"";position:absolute;left:10px;top:50%;width:4px;height:48px;margin-top:-24px;border-radius:3px;background:var(--sub);opacity:.35;transition:opacity .15s,background .15s}#ipdv i.on::after{opacity:.95;background:var(--leaf)}';document.head.appendChild(ipdvCss);
+  const ipd_DVMIN=.6,ipd_DVSNAP=.07;let ipd_dvSig='',ipd_dvEls={};
+  const ipd_dvRanges=()=>[wrap,app,app2,lib].filter(e=>e&&!e.hidden&&!e.classList.contains('wmini')&&e.style.gridColumn).map(e=>{const c=colOf(e);return[c[0]-1,c[1]-1]});
+  const ipd_dvBounds=rs=>[1,2].filter(k=>rs.some(r=>r[1]===k)&&rs.some(r=>r[0]===k));
+  var ipd_dvAp=null;   // 지금 적용된 선 위치 [첫째 선, 둘째 선] (칸 단위, 전체 3). null이면 똑같은 3칸
+  function ipd_dvAny(){try{return !!(mini[1]||mini[2]||mini.g||Object.keys(fws).some(t=>fws[t]&&fws[t].el&&!fws[t].el.hidden))}catch(_){return !!(mini[1]||mini[2]||mini.g)}}
+  function ipd_dvApply(){
+    if(!ipd_dvAp){stage.style.gridTemplateColumns='';return}
+    const B=ipd_dvAp;stage.style.gridTemplateColumns='minmax(0,'+B[0]+'fr) minmax(0,'+(B[1]-B[0])+'fr) minmax(0,'+(3-B[1])+'fr)';
+  }
+  function ipd_dvEach(){
+    const r=stage.getBoundingClientRect(),bs=window.__dvBs||[],B=ipd_dvAp||[1,2];
+    Object.keys(ipd_dvEls).forEach(k=>{if(!bs.includes(+k)){ipd_dvEls[k].hidden=true}});
+    bs.forEach(k=>{
+      let i=ipd_dvEls[k];if(!i)i=ipd_dvEls[k]=ipd_dvMake(k);
+      i.hidden=ipd_dvAny()||ovState>0;
+      i.style.left=(r.left+r.width*B[k-1]/3)+'px';i.style.top=r.top+'px';i.style.height=r.height+'px';
+    });
+  }
+  function ipd_dvMake(k){
+    const i=document.createElement('i');i.dataset.k=k;ipdvI.appendChild(i);
+    let d=null;
+    i.addEventListener('pointerdown',e=>{d={};i.classList.add('on');try{i.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault()});
+    i.addEventListener('pointermove',e=>{
+      if(!d)return;const r=stage.getBoundingClientRect(),bs=window.__dvBs||[];let p=(e.clientX-r.left)/Math.max(1,r.width)*3;
+      if(Math.abs(p-k)<ipd_DVSNAP)p=k;   // 칸 경계(1:2 · 2:2)에 가까우면 착 붙어요
+      let B=(ipd_dvAp||[1,2]).slice();
+      if(bs.length>=2){B=k===1?[Math.max(ipd_DVMIN,Math.min(B[1]-ipd_DVMIN,p)),B[1]]:[B[0],Math.max(B[0]+ipd_DVMIN,Math.min(3-ipd_DVMIN,p))]}
+      else if(k===1){const b1=Math.max(ipd_DVMIN,Math.min(3-ipd_DVMIN,p));B=[b1,(b1+3)/2]}
+      else{const b2=Math.max(ipd_DVMIN*2,Math.min(3-ipd_DVMIN,p));B=[b2/2,b2]}
+      ipd_dvAp=B;ipd_dvApply();ipd_dvEach();ipd_dvPoke()});
+    const up=()=>{if(!d)return;d=null;i.classList.remove('on');
+      if(ipd_dvAp&&Math.abs(ipd_dvAp[0]-1)<.001&&Math.abs(ipd_dvAp[1]-2)<.001){ipd_dvAp=null;ipd_dvApply();UI.dv=null}else UI.dv=ipd_dvAp?{s:ipd_dvSig,b:ipd_dvAp.slice()}:null;
+      try{ipSave()}catch(_){}ipd_dvEach();ipd_dvPoke()};
+    i.addEventListener('pointerup',up);i.addEventListener('pointercancel',up);
+    return i}
+  let ipd_dvRaf=0;function ipd_dvPoke(){if(ipd_dvRaf)return;ipd_dvRaf=requestAnimationFrame(()=>{ipd_dvRaf=0;try{gripPos();apGripPos()}catch(_){}try{window.dispatchEvent(new Event('resize'))}catch(_){}})}
+  function ipd_dvSync(){
+    try{
+      if(UI.mode!=='ipad'||UI.mac||gfull||stage.hidden){if(ipd_dvAp){ipd_dvAp=null;ipd_dvApply()}window.__dvBs=[];ipd_dvEach();return}
+      const rs=ipd_dvRanges(),bs=ipd_dvBounds(rs),sig=rs.map(r=>r.join('-')).sort().join(',');
+      window.__dvBs=bs;
+      if(sig!==ipd_dvSig){ipd_dvSig=sig;const sv=UI.dv&&UI.dv.s===sig&&Array.isArray(UI.dv.b)?UI.dv.b.map(Number):null;ipd_dvAp=sv&&bs.length?sv:null;ipd_dvApply()}
+      if(!bs.length&&ipd_dvAp){ipd_dvAp=null;ipd_dvApply()}
+      ipd_dvEach();
+    }catch(_){}
+  }
+  window.ipd_dvSync=ipd_dvSync;setInterval(ipd_dvSync,400);addEventListener('resize',()=>{try{ipd_dvEach()}catch(_){}});
 
   /* ---------- 떠 있는 앱 창: 앱마다 창 하나씩, 여러 개를 동시에. 끌어 옮기고, 오른쪽 아래로 크기 조절, 가장자리에 놓으면 절반으로 붙어요 ---------- */
   /* ---------- 창 틀 WM (큰 공사 2단계): 떠 있는 창의 저장소를 WM.wins 한 곳으로 모아요. fws는 같은 저장소의 다른 이름이라 옛 코드는 그대로 돌아가요. 3단계에서 칸 앱·작은 창·버튼 창도 여기로 옮겨요 ---------- */
@@ -6288,7 +6389,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     if(!force&&lastLg!=null&&Math.abs(sc.lg-lastLg)<0.001&&now-lastPub<180000)return;
     busy=true;
     try{
-      const all=window.ACC.list();
+      const all=[a];   // 지금 하는 계정의 재산만 올려요 (다른 계정과 섞이지 않게)
       for(const x of all){const pid=uid+'_'+x.id;
         if(norm(x.name)===window.ACC.OP){try{await rpc('delete_player',{p_id:pid,p_token:TOK,p_code:CODE})}catch(e){}continue}
         try{await rpc('publish_player',{p_id:pid,p_token:TOK,p_code:CODE,p_name:x.name,p_emoji:x.emoji||'',p_color:x.color||'',p_lg:sc.lg,p_money:sc.txt})}
@@ -7131,7 +7232,7 @@ window.GF=GF;
     for(var i=0;i<LS.length;i++){var k=LS.key(i);if(k==null||SKIP[k])continue;var v=LS.getItem(k);if(typeof v!=='string'||v.length>240000)continue;o[k]=v;tot+=k.length+v.length}
     return tot>560000?null:{v:1,t:Date.now(),ls:o};
   }
-  function sc(ls){var m=-1;if(!ls)return m;GK.forEach(function(k){try{var o=JSON.parse(ls[k]||'null');if(o){var x=(+o.prest||0)*1e6+(+o.rebTotal||+o.reb||0);if(x>m)m=x}}catch(_){}});return m}
+  function sc(ls){var m=-1;if(!ls)return m;Object.keys(ls).forEach(function(k){if(k.indexOf('money-buttons-v10-disc')!==0)return;try{var o=JSON.parse(ls[k]||'null');if(o){var x=(+o.prest||0)*1e6+(+o.rebTotal||+o.reb||0);if(x>m)m=x}}catch(_){}});return m}
   function creds(){var n=null,p=null;try{n=LS.getItem('mb-bk-name');p=LS.getItem('mb-bk-pass')}catch(_){}return n&&p?{n:n,p:p}:null}
   /* 비밀번호 없이 자동: 계정 이름으로 정한 열쇠를 써요 (이름과 초대 코드를 아는 사람은 열 수 있어요) */
   var dead=false;
