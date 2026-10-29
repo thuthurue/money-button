@@ -597,6 +597,33 @@ const freshNormal=()=>({money:Big.from(0),total:Big.from(0),nb:1,units:{},auto:{
 const fresh=()=>GMODE==='test'?freshTest():freshNormal();   // 울트라는 기본 모드와 똑같이 처음부터 (돈·환생·명성·각성석 모두 0)
 const freshTest=()=>({money:Big.from(1e40),total:Big.from(1e40),nb:1,units:{},auto:{},ab:{},sp:{},lb:{},bulk:3,m:[0,0,0,0,0,0,0,0,0,0],u:{p:0,log:0,gr:0,n:0},G:0,ts:0,reb:50,prest:50,slots:1,pow:50,rebTotal:50,seen4:1,pa:{p24_24:33},pt:{s24c3:15},awake:{m:1,e:1000000},awakeExp:0,awN:1,aw2:1,aw3:1,aw4:1,aw5:1,aw6:1,aw7:1,aw8:1,awPri:0,awOff:1,aw9:1,aw10:1,aw10t:1,aw10m:1,aw11:1,aw11a:1,aw11b:1,aw12:1,aw13:1,aw13a:1,aw13b:1,aw14:1,sq:[0,0,0,0],aw15:1,aw50:1,tier:[0,1],rx:0,rp:0,aw16:1,aw17:1,aw18:1,aw19:0,faMode:1});
 const S=fresh();
+/* ---------- 계정 기록(누적): 계정마다 따로, 게임 저장과 별개로 쌓여요. 환생·명성·처음부터 다시 해도 안 지워져요 ---------- */
+const LIFE=(()=>{
+  const PK='mb-life-v1';let id=null,D=null,dirty=false;
+  const zero=()=>Big.from(0);
+  const key=()=>PK+(ACC_ID?'@'+ACC_ID:'');
+  function flush(){if(!D||id===null)return;try{localStorage.setItem(PK+(id?'@'+id:''),JSON.stringify({sp:D.sp,ea:D.ea,pk:D.pk,t0:D.t0}))}catch(e){}dirty=false}
+  function ensure(){
+    if(D&&id===ACC_ID)return D;
+    if(D)flush();
+    id=ACC_ID;let o=null;try{o=JSON.parse(localStorage.getItem(key())||'null')}catch(e){}
+    if(o&&typeof o==='object'){D={sp:Big.from(o.sp||0),ea:Big.from(o.ea||0),pk:Big.from(o.pk||0),t0:o.t0||Date.now()}}
+    else{D={sp:zero(),ea:Big.from(S.total||0),pk:Big.from(S.money||0),t0:Date.now()};dirty=true}   // 처음 기록할 땐 지금까지 번 돈을 시작값으로 삼아요 (그 전 기록은 알 수 없어요)
+    return D;
+  }
+  const lg=b=>{let v=-1;try{v=Big.log10(b);if(v===Infinity)v=1e9;else if(!isFinite(v))v=-1}catch(e){}return v};
+  const api={
+    sp(c){try{const d=ensure();if(c&&Big.cmp(c,0)>0){d.sp=Big.add(d.sp,c);dirty=true}}catch(e){}},
+    ea(x){try{const d=ensure();if(x&&Big.cmp(x,0)>0){d.ea=Big.add(d.ea,x);dirty=true}}catch(e){}},
+    snap(){const d=ensure();if(Big.gt(S.money,d.pk)){d.pk=Big.from(S.money);dirty=true}
+      return{v:1,sp:fmt(d.sp),spl:lg(d.sp),ea:fmt(d.ea),eal:lg(d.ea),pk:fmt(d.pk),pkl:lg(d.pk),mn:fmt(S.money),
+        reb:S.reb||0,rbt:S.rebTotal||0,pr:S.prest||0,aw:fmt(S.awake||0),awl:lg(S.awake||0),awe:+(S.awakeExp||0)||0,md:GMODE,t0:d.t0}},
+    flush
+  };
+  setInterval(()=>{if(dirty)flush()},5000);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)flush()});window.addEventListener('pagehide',flush);
+  return api;
+})();
 const MN=()=>Big.toNum(S.money);   // 화면 보조. 1e308이 넘어도 돈은 Big으로 남고, 사기는 has()로 비교해요
 const set=(e,s)=>{if(e.textContent!==s)e.textContent=s};
 
@@ -614,15 +641,15 @@ const UNIT_BASE=n=>10*CS(n),UNIT_G=1.15;             // 개수 늘리기
 const UNIT_MAX=999;                                  // 버튼마다 개수 늘리기는 최대 999번까지 살 수 있어요
 const AUTO_BASE=n=>40*CS(n),AUTO_G=1.3,AUTO_MAX=24;  // 자동 누르기 기본 최대 24단계 = 1초에 15번. 명성 21을 85번 다 사면 109단계 = 1초에 100번 (버튼의 한계 돌파는 자동 누르기 최대에 안 더해져요)
 /* 시간 배율: 명성 5단계씩 묶음(0~4, 5~9, ... 45~49)마다 수입을 TB로 나눠요. 클수록 그 구간이 오래 걸려요. window.TB_SCALE로 전체를 한꺼번에 늘이고 줄일 수 있어요 (테스트 모드는 적용 안 함) */
-const TB=window.TB_OVERRIDE||[1,5,1,1,1,1,1,1,1,1];   // 명성 0~4: 1(수입 그대로, 대신 가격 배율 4.5) · 5~9: 5 (구간 시간 맞춤, 10~49는 아직 안 정했어요)
-const TA=window.TA_OVERRIDE||[1,1,1.006,1,1,1,1,1,1,1];   // 구간마다 환생을 할수록 수입이 a^-n배로 느려져요 (n=그 구간에서 한 환생 횟수). 화면에 보이는 초당 수입에는 안 들어가요. 테스트 모드는 적용 안 함
+const TB=window.TB_OVERRIDE||[1,1,1,1,1,1,1,1,1,1];   // 명성 0~4: 1(수입 그대로, 대신 가격 배율 4.5) · 5~9: 5 (구간 시간 맞춤, 10~49는 아직 안 정했어요)
+const TA=window.TA_OVERRIDE||[1,1,1,1,1,1,1,1,1,1];   // 구간마다 환생을 할수록 수입이 a^-n배로 느려져요 (n=그 구간에서 한 환생 횟수). 화면에 보이는 초당 수입에는 안 들어가요. 테스트 모드는 적용 안 함
 const TSC=()=>{if(typeof GMODE!=='undefined'&&GMODE==='test')return 1;const p=(typeof S==='object'&&S&&S.prest)||0,b=Math.min(TB.length-1,Math.floor(p/5));
   const n=Math.max(0,((S&&S.reb)||0)-(b>=2?prestNeed(5*b-1):0));   // 7번째 명성까지는 환생이 0으로 돌아가고, 그 뒤는 구간 시작 때의 횟수를 빼요
   return Math.pow(TA[Math.min(TA.length-1,b)],-n)/((window.TB_SCALE||1)*TB[b])};
 const FIRSTX=()=>1+19*Math.max(0,1-((typeof S==='object'&&S&&S.prest)||0)/8);   // "처음 하는 것"(새 버튼·버튼마다 처음 한계 돌파·자동구매) 가격 배율: 명성 0이면 20배, 명성이 오를수록 줄어 8이면 1배 (초반에만 막히고 뒤쪽은 안 막히게)
 const MAKE=n=>50*CS(n)*FIRSTX();                              // n번 버튼 생성
 const AB_FRAC=0.25;                                  // 자동구매는 가격이 지금 돈의 25% 이하일 때만 사요
-const AB_COST=b=>pxAny(20*b*FIRSTX());                               // 자동구매 기능 가격 = 그 업그레이드 첫 가격의 20배
+const AB_COST=b=>pxAny(20*b*FIRSTX(),'au');                               // 자동구매 기능 가격 = 그 업그레이드 첫 가격의 20배
 const AW9_MAX=1000,AW9_COST=n=>n+1;                   // 각성 9: n은 0에서 시작해 1000까지 (산 횟수 = n). 환생 비용은 n제곱근이고, n이 0이나 1이면 그대로예요
 const aw9n=()=>Math.min(AW9_MAX,S.aw9||0);
 const AW10_COST=()=>1;                                 // 각성 10: 오프라인 잠금해제. 한 번만
@@ -677,12 +704,12 @@ function bkWithdraw(){
   if(!Big.gt(b.p,0))return;
   S.money=Big.add(S.money,b.p);b.p=Big.from(0);done();
 }
-const bkIvPlan=()=>{const b=bk();return plan(BK_IV_BASE,BK_IV_G,b.iv||0,BK_IV_MAX-(b.iv||0),MODE==='max'?'max':1)};
-const bkRtPlan=()=>{const b=bk();return plan(BK_RT_BASE,BK_RT_G,b.rt||0,bkRtMax()-(b.rt||0),MODE==='max'?'max':1)};
+const bkIvPlan=()=>{const b=bk();return plan(BK_IV_BASE,BK_IV_G,b.iv||0,BK_IV_MAX-(b.iv||0),MODE==='max'?'max':1,undefined,'ck')};
+const bkRtPlan=()=>{const b=bk();return plan(BK_RT_BASE,BK_RT_G,b.rt||0,bkRtMax()-(b.rt||0),MODE==='max'?'max':1,undefined,'ck')};
 function nextBkIv(){if(!S.aw18)return null;bkTick();const b=bk(),p=bkIvPlanOne();if(!p.k||!okCost(p.cost)||!has(p.cost))return null;return{cost:p.cost,run:()=>{b.iv=(b.iv||0)+1}}}
 function nextBkRt(){if(!S.aw18)return null;bkTick();const b=bk(),p=bkRtPlanOne();if(!p.k||!okCost(p.cost)||!has(p.cost))return null;return{cost:p.cost,run:()=>{b.rt=(b.rt||0)+1}}}
-const bkIvPlanOne=()=>{const b=bk();return plan(BK_IV_BASE,BK_IV_G,b.iv||0,BK_IV_MAX-(b.iv||0),1)};
-const bkRtPlanOne=()=>{const b=bk();return plan(BK_RT_BASE,BK_RT_G,b.rt||0,bkRtMax()-(b.rt||0),1)};
+const bkIvPlanOne=()=>{const b=bk();return plan(BK_IV_BASE,BK_IV_G,b.iv||0,BK_IV_MAX-(b.iv||0),1,undefined,'ck')};
+const bkRtPlanOne=()=>{const b=bk();return plan(BK_RT_BASE,BK_RT_G,b.rt||0,bkRtMax()-(b.rt||0),1,undefined,'ck')};
 /* 명성 35·36: 이자 주기마다 가진 돈의 35%를 맡겼다가 그 중 36%를 바로 꺼내는 왕복(비율은 서로 곱해서 f=35%×36%). 저장 이름은 s37·s38 그대로.
    이 자동 왕복의 보상은 이자를 제곱근으로 해서 재산이 주기마다 (1+f×(√(1+이자율)-1))배 돼요 (이자율 100%·f 100%면 √2배).
    꺼져 있던 동안의 주기도 한꺼번에 곱해요. 직접 맡기고 꺼내는 건 그대로 (1+이자율)배 */
@@ -696,7 +723,7 @@ function bkAuto(){
   const f=s37()*s38()/1e6,r=bkRate();
   if(!(f>0)||!(r>0)||!Big.gt(S.money,0))return;
   const x=f*(Math.sqrt(1+r)-1);
-  S.money=Big.mul(S.money,Big.fromLog10(k*Math.log1p(x)/Math.LN10));
+  {const b0=S.money;S.money=Big.mul(S.money,Big.fromLog10(k*Math.log1p(x)/Math.LN10));LIFE.ea(Big.max(Big.sub(S.money,b0),0))}
   clampMoney();
 }
 function buyBkIv(){if(!S.aw18)return;bkTick();const p=bkIvPlan();if(p.k&&pay(p.cost)){bk().iv=(bk().iv||0)+p.k;done()}}
@@ -718,16 +745,16 @@ function wlIncome(){return realPrest()>=26?wlMulK('s'):Big.from(1)}   // 버는 
 function wlGainOf(i){return i===0&&realPrest()>=49?wlMulK('g'):Big.from(1)}   // 누를 때 받는 개수: 실버는 ×2^골드, 골드는 1
 function p41Mult(){const n=p41n();return n>0?Big.from(Math.pow(2,n)):Big.from(1)}
 const SQ_E0=[100,200,300,400],SQ_EG=[40,80,120,160];       // 가격 = 10^(E0 + EG × 산 횟수). 여기 숫자만 바꾸면 가격이 바뀌어요
-const SQ_COST=(i,l)=>pxAny(Big.fromLog10(SQ_E0[i]+SQ_EG[i]*l));
+const SQ_COST=(i,l)=>pxAny(Big.fromLog10(SQ_E0[i]+SQ_EG[i]*l),'sq');
 const sqLv=i=>Math.max(0,Math.min(sqCap(),(S.sq&&S.sq[i])||0));
 // 명성 30: 제곱 5~10 (배율 6·7·8·9·10·11의 거듭제곱). 제곱 5는 제곱 4를 산 뒤에 열려요. 저장은 S.sq[5~10] (S.sq[4]는 팩토리얼 구매 횟수)
 const SQ2_BASE=[6,7,8,9,10,11],SQ2_AT=30;
-const SQ2_COST=(k,l)=>pxAny(Big.fromLog10(PL(30)-8+(k*10+l)/59*(PL(38)-PL(30)+8)));    // 가격 = 10^(100n + 40n × 산 횟수), n=5~10 (임시값)
+const SQ2_COST=(k,l)=>pxAny(Big.fromLog10(PL(30)-8+(k*10+l)/59*(PL(38)-PL(30)+8)),'sq');    // 가격 = 10^(100n + 40n × 산 횟수), n=5~10 (임시값)
 const sq2Lv=k=>prestigeOf()>=SQ2_AT?Math.max(0,Math.min(sqCap(),(S.sq&&S.sq[5+k])||0)):0;
 /* 명성 38: 제곱 11~25 (배율 12~26의 거듭제곱) 하나씩 열려요. 제곱 11은 제곱 10을 산 뒤에. 명성 40을 사면 제곱 26~100까지 (배율은 제곱 번호+1). 저장은 S.sq[번호] */
 const SQ3_AT=38,SQ3_N0=11;
 const sq3Cnt=()=>prestigeOf()>=SQ3_AT?15+q40():0;                 // 열려 있는 제곱 수 (제곱 11 ~ 25+명성40)
-const SQ3_COST=(n,l)=>pxAny(Big.fromLog10(100*n+40*n*l));               // 가격 = 10^(100n + 40n × 산 횟수) (임시값)
+const SQ3_COST=(n,l)=>pxAny(Big.fromLog10(100*n+40*n*l),'sq');               // 가격 = 10^(100n + 40n × 산 횟수) (임시값)
 const sq3Lv=n=>(n>=SQ3_N0&&n<SQ3_N0+sq3Cnt())?Math.max(0,Math.min(sqCap(),(S.sq&&S.sq[n])||0)):0;
 const sq3Prev=n=>n===SQ3_N0?sq2Lv(5):sq3Lv(n-1);                  // 앞 제곱을 산 횟수
 const sqMult=()=>{
@@ -740,7 +767,7 @@ const sqMult=()=>{
 };
 // 팩토리얼 (각성 16): 버는 돈 × n!. n은 방식 하나만 골라요 (S.faMode 0=구매 횟수, 1=지수). 구매 횟수는 S.sq[4]에 담아 제곱과 같이 남거나 초기화돼요
 const FA_MAX=10,FA_E0=300,FA_EG=100;                     // 가격 = 10^(FA_E0 + FA_EG × 산 횟수). 임시값이에요
-const FA_COST=l=>pxAny(Big.fromLog10(FA_E0+FA_EG*l));
+const FA_COST=l=>pxAny(Big.fromLog10(FA_E0+FA_EG*l),'fa');
 const faLv=()=>Math.max(0,Math.min(FA_MAX,(S.sq&&S.sq[4])||0));
 const FACT_LOG=[0];                                      // FACT_LOG[n] = log10(n!)
 const faLog=n=>{while(FACT_LOG.length<=n)FACT_LOG.push(FACT_LOG[FACT_LOG.length-1]+Math.log10(FACT_LOG.length));return FACT_LOG[n]};
@@ -778,7 +805,7 @@ const rebL0=r=>Math.log10(500)+REB_M0*r+REB_K*r*(r-1)/2;                       /
 const REB_LA=Math.log10(500)+REB_M0*REB_R0+REB_K1*REB_R0*(REB_R0-1)/2, REB_S0=REB_M0+REB_K1*(REB_R0-1), REB_N=REB_R1-REB_R0;
 const REB_K2=(rebL0(REB_R1)-REB_LA-REB_S0*REB_N)/(REB_N*(REB_N-1)/2);          // 1000번에서 원래 곡선과 같아지게 정한 가운데 구간 경사
 const rebLog=r=>r<=REB_R0?Math.log10(500)+REB_M0*r+REB_K1*r*(r-1)/2:r<REB_R1?REB_LA+REB_S0*(r-REB_R0)+REB_K2*(r-REB_R0)*(r-REB_R0-1)/2:rebL0(r);
-const RG=window.RG_OVERRIDE||[1,1,1,1e40,1e40,1e40,1,1,1,1];   // 구간마다 환생을 할수록 환생 가격이 g^-n배로 완만하게 늘어요(n=그 구간에서 한 환생 횟수). 1이면 그대로. 크면 환생을 더 많이 할 수 있어요. 테스트 모드는 적용 안 함
+const RG=window.RG_OVERRIDE||[1,1,1,1,1,1,1,1,1,1];   // 구간마다 환생을 할수록 환생 가격이 g^-n배로 완만하게 늘어요(n=그 구간에서 한 환생 횟수). 1이면 그대로. 크면 환생을 더 많이 할 수 있어요. 테스트 모드는 적용 안 함
 const rebRelief=()=>{if(typeof GMODE!=='undefined'&&GMODE==='test')return 0;const p=(typeof S==='object'&&S&&S.prest)||0,b=Math.min(RG.length-1,Math.floor(p/5)),g=RG[b];if(!(g>1))return 0;const n=Math.max(0,((S&&S.reb)||0)-(b>=2?prestNeed(5*b-1):0));return n*Math.log10(g)};
 const rebBase=r=>{r=Math.max(0,r-rbExtra());const L=Math.max(0,rebLog(r)-rebRelief());return L<300?(r===0?500:Math.floor(Math.pow(10,L))):Big.fromLog10(L)};
 const REB_COST=(r,n)=>dprice('r',rootCost(rebBase(r),n===undefined?aw9n():n));  // 환생 조건 (가진 돈). 첫 가격 500원(예전 5000원)에서 20배씩. 15·23 환생 할인을 곱해서 깎아요. 1e308 넘어도 끊지 않아요
@@ -827,7 +854,7 @@ const PREST_LINE=[
 ];
 const PREST_LINE_ALL=PREST_LINE.slice(0,25).concat(['실버 버튼. 누르면 1개씩 받고, 개수 n개면 버는 돈이 ×2^(n/2). 병아리 모이는 실버 개수+1의 제곱배(×(n+1)²)'],PREST_LINE.slice(25));PREST_LINE_ALL.push('병아리 앱. 병아리가 일해서 모이(병아리 재산)를 벌고, 번 만큼 돈에도 1:1로 들어와요. 레벨마다 수입 ×2, 모습이 바뀔 때마다 ×3 더');while(PREST_LINE_ALL.length<48)PREST_LINE_ALL.push('');PREST_LINE_ALL.push('골드 버튼. 누르면 1개씩 받고, 개수 n개면 누를 때 받는 실버가 ×2^(n/4)');PREST_LINE_ALL.push('각성 20 이상 잠금해제 (아직 준비 중이에요)');   // 26 실버, 27~42는 예전 26~41, 49 골드, 50 각성 20+
 PREST_LINE_ALL[47]='복리 확장. 복리 이자율 최대치를 0.1%씩 올려 최종 10,000%까지 (99,000번)';PREST_LINE_ALL[44]='자동 환생도 연속 환생. 환생 버튼처럼 한 번에 돈이 되는 만큼 이어서 환생해요 (최대 횟수도 같아요)';PREST_LINE_ALL[45]='자동 누르기 잠금해제. 사면 실버 탭(46-1)·골드 탭(46-2)에서 자동 누르기를 그 재산으로 사요. 1초에 최대 100번';PREST_LINE_ALL[43]='병아리 업그레이드. 모이로 밥 한 번에 채우는 양·배고픔 최대치를 올려요. 배고픔 최대치가 1,000이 되면 최대치 ×2·밥 채우기 +0.1%도 열려요. 일터·쉼터 업그레이드도 있어요';
-const SPD_COST=(b,l)=>pxAny(powCost(5*b,1.7,l)),SPD_MAX=18;     // 자동구매 속도 (업그레이드마다 따로). 커져도 1e308에서 끊지 않아요
+const SPD_COST=(b,l)=>pxAny(powCost(5*b,1.7,l),'au'),SPD_MAX=18;     // 자동구매 속도 (업그레이드마다 따로). 커져도 1e308에서 끊지 않아요
 const S18_MAX=90,S18_BASE=PB(18),S18_G=PG(18,90,20);             // 18-1·18-2·18-3: 속도 한계 +1, 90번까지 (기본 1초에 10번 + 90 = 최대 1초에 100번)
 const s18=()=>Math.min(S18_MAX,ptier('s18')||0);
 const s18d2=()=>prestigeOf()>=23?Math.min(S18_MAX,ptier('s18d2')||0):0;
@@ -877,7 +904,7 @@ function tickAwake(){
   if(e>prev){S.awake=awAdd(S.awake||0,e-prev);S.awakeExp=e}
 }
 const prestCap=()=>S.aw17?50:25;   // 각성 17을 사면 명성을 26~50까지 올릴 수 있어요
-const RBM=window.RBM_OVERRIDE||[1,4,4.2,26,21.5,4.8,1,1,1,1];   // 명성 5~9: 4 · 10~14: 4.205 (더 키우면 환생 가격이 수입을 앞질러 못 넘어가는 벽이 생겨요)   // 명성 5개씩 묶음마다 필요한 환생 수를 늘리는 배율(클수록 그 구간이 오래 걸려요). window.RB_SCALE로 전체 조절. 테스트 모드는 적용 안 함
+const RBM=window.RBM_OVERRIDE||[1,1,1,1,1,1,1,1,1,1];   // 명성 5~9: 4 · 10~14: 4.205 (더 키우면 환생 가격이 수입을 앞질러 못 넘어가는 벽이 생겨요)   // 명성 5개씩 묶음마다 필요한 환생 수를 늘리는 배율(클수록 그 구간이 오래 걸려요). window.RB_SCALE로 전체 조절. 테스트 모드는 적용 안 함
 const baseNeed=n=>Math.ceil(n*(n+1)/2*Math.pow(1.15,Math.max(0,n-26)));
 function prestNeed(p){const q=p||0,n=q+1;
   if(typeof GMODE!=='undefined'&&GMODE==='test')return baseNeed(n);
@@ -894,7 +921,7 @@ const pcdLeft=()=>Math.max(0,pcdNeed()-pcdT);
 const pcdOK=()=>pcdLeft()<=0;
 let rcdT=1e9;
 /* 환생 최소 간격(초): 환생을 한 뒤 이만큼 지나야 다시 환생할 수 있어요(환생 버튼·자동 환생·봇 모두). 연속 환생 한 번은 한 번으로 셈요. 명성 5개씩 묶음(인덱스=floor(명성/5)). 환생 사이에 산 것(자동구매 속도·한계 돌파 등)을 다시 살 시간을 주려고 만들었어요. window.RCD_OVERRIDE로 바꿀 수 있어요. 테스트 모드는 적용 안 함 */
-const RCD=window.RCD_OVERRIDE||[0,0,0,0.2,0.2,0.2,0,0,0,0];
+const RCD=window.RCD_OVERRIDE||[0,0,0,0.2,0.2,0.2,0.2,0,0,0];
 const rcdNeed=()=>{if(typeof GMODE!=='undefined'&&GMODE==='test')return 0;const p=(typeof S==='object'&&S&&S.prest)||0;return RCD[Math.min(RCD.length-1,Math.floor(p/5))]||0};
 const rcdReady=()=>rcdT>=rcdNeed();
 const rcdTry=()=>{if(!rcdReady())return false;rcdT=0;return true};
@@ -1082,10 +1109,10 @@ const sumCost=(base,g,l,k)=>{
 };
 const okCost=c=>typeof c==='number'?isFinite(c)&&c>=0:!!(c&&typeof c.m==='number'&&isFinite(c.e));
 const has=c=>okCost(c)&&Big.gte(S.money,c);
-function plan(base,g,l,cap,mode=MODE,cat){
+function plan(base,g,l,cap,mode=MODE,cat,kind){
   if(cap<1)return{k:0,cost:0};
   const f=cat?(1-disc(cat))*(1-disc2(cat))*(1-disc3(cat)):1;          // 할인 적용 후 가격 비율 (대략. 최대 개수 계산용)
-  const sc=k=>{const v=sumCost(base,g,l,k);return cat?dprice(cat,v):(typeof v==='number'?Math.floor(pxAny(v)):pxAny(v))};   // 큰 숫자(Big)는 Math.floor를 하면 NaN이 돼서 명성 할인·26~ 보상 가격이 ∞로 보이고 자동구매도 못 샀어요
+  const sc=k=>{const v=sumCost(base,g,l,k);return cat?dprice(cat,v):(typeof v==='number'?Math.floor(pxAny(v,kind)):pxAny(v,kind))};   // 큰 숫자(Big)는 Math.floor를 하면 NaN이 돼서 명성 할인·26~ 보상 가격이 ∞로 보이고 자동구매도 못 샀어요
   let k;
   if(mode==='max'){
     const moneyLog=Big.log10(S.money);
@@ -1174,6 +1201,7 @@ function load(){
       tickAwake();
     }
   }catch(e){}
+  pxDirty();
 }
 
 /* ---------- 카드 만들기 ---------- */
@@ -1243,7 +1271,7 @@ function xDraw(x,key,base,lock,hasLb){
 // 처음엔 10초에 1번. 속도를 올리면 1초에 10번까지 (자동구매 속도와 같은 단계)
 const PA=[{id:'kp',at:9,name:'명성해도 진행 유지'},{id:'sp',at:11,name:'자동구매 업그레이드'},{id:'lb',at:12,name:'한계 돌파 자동'},{id:'reb',at:13,name:'13 · 자동 환생'},{id:'prest',at:14,name:'14 · 자동 명성'},{id:'tier_kp',at:16,name:'16-1 · 10 단계 자동구매'},{id:'tier_sp',at:16,name:'16-2 · 11 단계 자동구매'},{id:'tier_lb',at:16,name:'16-3 · 12 단계 자동구매'},{id:'tier_d',at:16,name:'16-4 · 15 할인 자동구매'},{id:'tier_d2',at:23,name:'16-5 · 23 할인 자동구매'},{id:'tier_sq',at:31,name:'16-6 · 제곱 자동구매'},{id:'pasp_sp',at:17,name:'17-1 · 11 속도 자동구매'},{id:'pasp_lb',at:17,name:'17-2 · 12 속도 자동구매'},{id:'pasp_reb',at:17,name:'17-3 · 13 속도 자동구매'},{id:'pasp_prest',at:17,name:'17-4 · 14 속도 자동구매'},{id:'p19_tier',at:19,name:'19-1 · 16 속도 자동구매'},{id:'p19_pasp',at:19,name:'19-2 · 17 속도 자동구매'},{id:'p19_s18',at:19,name:'19-3 · 18-1·18-2 한계 자동구매'},{id:'p24_19',at:24,name:'24-1 · 19 속도 자동구매'},{id:'p24_21',at:24,name:'24-2 · 21 자동구매'},{id:'p24_24',at:24,name:'24-3 · 24 자동구매'},{id:'p33',at:33,name:'34-1 · 이자 주기 자동구매'},{id:'p34',at:33,name:'34-2 · 이자율 자동구매'}];   // 16·17·19·24는 대상마다 속도를 따로 사요
 const PA_BASE=1e12,PA_G=1.7,PA_MAX=SPD_MAX;          // 속도 가격 = 1조 × 1.7^단계
-const PA_COST=l=>pxAny(Math.floor(PA_BASE*Math.pow(PA_G,l)));
+const PA_COST=l=>pxAny(Math.floor(PA_BASE*Math.pow(PA_G,l)),'au');
 const paLvl=id=>S.pa[id]||0,paRate=id=>rate(1+paLvl(id));
 const pcc={};
 /* 10-1~10-7: 명성해도 남는 것을 넓히는 단계 / 11-1~11-7, 12-1~12-7: 자동 구매 대상을 넓히는 단계 (돈으로 한 번씩 사요) */
@@ -1253,7 +1281,7 @@ const PT={
   sp:{at:11,max:7,labels:['버튼만','곱하기 포함','초당 수입 포함','1초에 25레벨까지','처음부터 버튼 열림','처음부터 곱하기 열림','처음부터 초당 수입 열림']},
   lb:{at:12,max:7,labels:['곱하기 1·2','곱하기 3~10 포함','초당 수입 포함','1초에 25레벨까지','처음부터 곱하기 1·2 열림','처음부터 곱하기 3~10 열림','처음부터 초당 수입 열림']}
 };
-const PT_COST=t=>pxAny(1e9*Math.pow(100,t-1));             // 단계 t 가격: 10억, 1000억, 10조, 1000조 ...
+const PT_COST=t=>pxAny(1e9*Math.pow(100,t-1),'au');             // 단계 t 가격: 10억, 1000억, 10조, 1000조 ...
 const PA_MAX25=PA_MAX+15;                             // 4단계: 초당 25번까지 (속도 33단계)
 const ptier=id=>(S.pt&&S.pt[id])||0;
 /* ---------- 명성 15: 할인 ---------- */
@@ -1305,10 +1333,41 @@ function d3Plan(i){
   if(prestigeOf()<DISC3_AT)return{k:0,cost:0};
   const l=fLv(i);return plan(DISC3_C0,DISC3_G,l,disc3MaxLv()-l,1);
 }
-const PXB=window.PX_OVERRIDE||[4.5,1,1,1,1,1,1,1,1,1];   // 명성 5개 묶음마다 구매 가격에 곱하는 배율(클수록 그 구간이 오래 걸려요). 환생 가격에는 안 곱해요. 테스트 모드는 적용 안 함
-const PX=()=>{if(typeof GMODE!=='undefined'&&GMODE==='test')return 1;const p=(typeof S==='object'&&S&&S.prest)||0;return PXB[Math.min(PXB.length-1,Math.floor(p/5))]};
-function pxAny(v){const k=PX();if(k===1)return v;return (v&&typeof v==='object')?Big.mul(v,k):Math.floor(v*k+1e-6)}   // 할인 없는 가격(자동구매·보상·한번에 구매 등)에도 구간 가격 배율을 곱해요 (환생 제외)
-function dprice(cat,c){const v=dprice0(cat,c),k=cat==='r'?1:PX();if(k===1)return v;return (v&&typeof v==='object')?Big.mul(v,k):Math.floor(v*k+1e-6)}
+/* 가격 = 원래 가격 × 내가 벌 수 있는 돈에 맞춘 배율(K). 환생 가격까지 돈으로 사는 모든 것에 곱해요.
+   벌 수 있는 돈 E = 초당 수입(자동 누르기 포함) + 버튼을 한 번씩 누른 수입. 재산 배율·버는 배율·각성·환생 배율이 다 들어 있어요.
+   K = E^PXE_A (E가 1 이하면 1, 지금 0.15: 30x 봇으로 재 보니 명성 1~4가 목표 시간과 비슷). 구매·환생·명성·계정 불러오기 뒤에만 다시 계산하고, 그 사이엔 가격이 안 바뀌어요. 테스트 모드는 적용 안 함 */
+const PXE_A=window.PXE_A!==undefined?window.PXE_A:0.15;
+/* 가격 종류 10개: 종류마다 지수를 따로 둬요. 0 버튼 / 1 곱하기 / 2 초당 수입 / 3 환생 / 4 한계 돌파 / 5 제곱 / 6 팩토리얼 / 7 병아리 / 8 자동구매(기능·속도·한번에 구매) / 9 명성 상점·그 밖 */
+const PXK=['b','m','p','r','l','sq','fa','ck','au','pr'];
+const PXI=k=>{const i=PXK.indexOf(k);return i<0?9:i};
+const PXE_TAB=(()=>{const t=new Array(51).fill(PXE_A);t[4]=0.193;t[5]=0.24;t[6]=0.264;return t})();   // 명성 n일 때 쓰는 지수. 숫자 하나면 모든 종류가 같고, 길이 10 배열이면 종류별(위 순서)이에요. 7부터는 아직 못 재서 기본값 그대로
+const pxExp=(pp,ki)=>{const e=(window.PXE_AT&&window.PXE_AT[pp]!==undefined)?window.PXE_AT[pp]:PXE_TAB[pp];return typeof e==='number'?e:(e&&e[ki]!==undefined?e[ki]:PXE_A)};
+let PXE_KS=[],PXE_DIRTY=true,PXE_BUSY=false;
+const pxDirty=()=>{PXE_DIRTY=true};
+function pxRecalc(){
+  PXE_BUSY=true;
+  try{
+    const c=calc();let E=c.ps;
+    for(let n=1;n<=S.nb;n++)E=Big.add(E,press(n,c.A));
+    let l=Big.log10(E);if(l===Infinity)l=1e9;else if(!isFinite(l))l=0;
+    const pp=Math.min(S.prest|0,50),ks=[];
+    for(let i=0;i<PXK.length;i++){
+      const lk=pxExp(pp,i)*Math.max(0,l);
+      ks.push(lk<=0?1:lk<300?Math.pow(10,lk):Big.fromLog10(lk));
+    }
+    PXE_KS=ks;
+  }catch(e){PXE_KS=PXK.map(()=>1)}
+  PXE_DIRTY=false;PXE_BUSY=false;
+}
+const PX=k=>{if(typeof GMODE!=='undefined'&&GMODE==='test')return 1;if(PXE_BUSY)return 1;if(PXE_DIRTY)pxRecalc();const v=PXE_KS[PXI(k)];return v===undefined?1:v};
+function pxMul(v,k){
+  if(k===1)return v;
+  if(v&&typeof v==='object')return Big.mul(v,k);
+  if(typeof k==='number'){const r=v*k;if(isFinite(r)&&r<1e15)return Math.floor(r+1e-6)}
+  return Big.mul(Big.from(v),k);
+}
+function pxAny(v,kind){const k=PX(kind||'pr');return k===1?v:pxMul(v,k)}   // 할인 없는 가격(자동구매·보상·한번에 구매 등)에도 종류별 배율
+function dprice(cat,c){const v=dprice0(cat,c),k=PX(cat);return k===1?v:pxMul(v,k)}
 function dprice0(cat,c){                               // 15 할인을 먼저 깎고, 그 가격에서 23 할인을 한 번 더 깎아요
   const d1=1-disc(cat),d2=disc2(cat),d3=disc3(cat);
   if(c&&typeof c==='object'){
@@ -1622,7 +1681,7 @@ const P41_UI=mkS('42 · 돈 나누고 수입 늘리기');
 P41_UI.btn.onclick=()=>{
   if(prestigeOf()<41)return;const n=p41n();if(n>=P41_MAX)return;
   const m=n+1,need=Big.fromLog10(m);if(!has(need))return;
-  S.money=Big.div(S.money,need);S.pt.p41=m;done();
+  {const b0=S.money;S.money=Big.div(S.money,need);LIFE.sp(Big.sub(b0,S.money))}S.pt.p41=m;done();
 };
 /* 명성 42·43: 실버·골드 버튼. 기본 버튼처럼 생겼고, 누를 때마다 1개씩 받아요. 실버 n개면 버는 돈이 ×2^(n/2)배, 골드 n개면 누를 때 받는 실버가 ×2^(n/4)배예요.
    저장은 S.pt 안에 (환생·명성 뒤에도 남아요) */
@@ -1643,7 +1702,7 @@ const WL_UI=WL.map((w,i)=>{
 WL_UI.forEach((u,i)=>$('l-w'+WL[i].k).appendChild(u.box));   // 실버·골드는 각각 앱(탭)이에요
 /* 명성 46: 자동 누르기 잠금해제(돈으로 사요). 사면 실버 탭 46-1, 골드 탭 46-2에서 각자 그 재산으로 자동 누르기 속도를 사요 (1초에 +1번씩, 최대 100번). 가격은 임시값 */
 const WA_MAX=100,U46_AT=46;
-const U46_COST=()=>pxAny(Big.fromLog10(PL(46)-8));
+const U46_COST=()=>pxAny(Big.fromLog10(PL(46)-8),'pr');
 const waLv=i=>Math.min(WA_MAX,(S.pt&&S.pt[i?'wa2':'wa1'])||0);
 const waCost=(i,n)=>i?Math.floor(30*Math.pow(1.35,n)):Big.fromLog10(2+0.2*n+0.003*n*n);   // 실버는 갈수록 가격이 가파르게 올라요 (10^(2+0.2n+0.003n²), 마지막 100번째는 약 10^52). 골드는 그대로
 function buyU46(){
@@ -1763,7 +1822,7 @@ function ckUpK(i){const room=CK_UPS[i][1]-ckUp(i);if(room<=0)return 0;
 function ckEarn(x){   // 모이도 돈도 같은 양 (1:1)
   if(!(Big.cmp(x,0)>0))return;
   S.pt.ck_money=Big.add(ckMoney(),x);
-  S.money=Big.add(S.money,x);S.total=Big.add(S.total,x);clampMoney();
+  S.money=Big.add(S.money,x);S.total=Big.add(S.total,x);LIFE.ea(x);clampMoney();
 }
 (function(){
   const css=`.ck-stage{position:relative;margin-top:10px;height:260px;border-radius:18px;border:2px solid var(--line);overflow:hidden;touch-action:manipulation;background:radial-gradient(circle at 20% 30%,var(--leaf-soft) 0 2px,transparent 3px) 0 0/34px 34px,radial-gradient(circle at 70% 70%,var(--leaf-soft) 0 2px,transparent 3px) 0 0/46px 46px,var(--bg)}
@@ -2385,7 +2444,7 @@ function render(){
   $('qty').hidden=prest<3||TAB!=='btn';
   document.querySelectorAll('.qty button').forEach((b,i)=>{
     if(!BULK[i])return;   // 모아보기 카드처럼 복사된 버튼은 건너뛰어요
-    const q=[BULK[i][0],pxAny(BULK[i][1])],lb=q[0]==='max'?'최대':q[0]+'번';
+    const q=[BULK[i][0],pxAny(BULK[i][1],'au')],lb=q[0]==='max'?'최대':q[0]+'번';
     set(b,i<=S.bulk?lb:i===S.bulk+1?`${lb}\n${fmt(q[1])}원`:`${lb}\n잠김`);
     b.classList.toggle('locked',i>S.bulk+1);
     b.classList.toggle('can',i===S.bulk+1&&has(q[1]));
@@ -2732,8 +2791,8 @@ function render(){
   syncFolds();
 }
 
-const pay=c=>{if(!okCost(c)||!has(c))return false;S.money=Big.sub(S.money,c);return true};
-const done=()=>{save();render()};
+const pay=c=>{if(!okCost(c)||!has(c))return false;S.money=Big.sub(S.money,c);LIFE.sp(c);pxDirty();return true};
+const done=()=>{pxDirty();save();render()};
 function makeMore(){let L=s32();while(L-->0&&S.nb<maxBtn()&&pay(dcost('b',MAKE(S.nb+1))))S.nb++}   // 명성 32: 버튼도 함께 (가격은 각자)
 function makeNext(){if(S.nb>=maxBtn())return;if(pay(dcost('b',MAKE(S.nb+1)))){S.nb++;makeMore();done()}}
 function buyUnit(n){const p=unitPlan(n);if(p.k&&pay(p.cost)){S.units[n]=(S.units[n]||0)+p.k;chainBuy('u',n);done()}}
@@ -2791,7 +2850,7 @@ function autoBuy(dt){
         const p=e.plan(1);
         if(p.k<1||!okCost(p.cost))break;
         if(!(has(p.cost)&&Big.lte(p.cost,Big.mul(S.money,e.k==='mk'?1:AB_FRAC))&&Big.gte(Big.sub(S.money,p.cost),reserveFor(4))))break;
-        S.money=Big.sub(S.money,p.cost);e.buy(p);acc[id]-=1;q++;
+        S.money=Big.sub(S.money,p.cost);LIFE.sp(p.cost);pxDirty();e.buy(p);acc[id]-=1;q++;
       }
       if(acc[id]>1)acc[id]=1;
     }
@@ -2828,7 +2887,7 @@ function pop(e,v){
   s.style.left=x+'px';s.style.top=(y-24)+'px';
   document.body.appendChild(s);setTimeout(()=>s.remove(),700);
 }
-function pressBtn(n,e){const v=Big.mul(press(n,mult()),TSC());S.money=Big.add(S.money,v);S.total=Big.add(S.total,v);clampMoney();pop(e,v);render()}
+function pressBtn(n,e){const v=Big.mul(press(n,mult()),TSC());S.money=Big.add(S.money,v);S.total=Big.add(S.total,v);LIFE.ea(v);clampMoney();pop(e,v);render()}
 let TAB='btn';
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   if(b.hidden) return;
@@ -2858,13 +2917,13 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
 })();
 document.querySelectorAll('.qty button').forEach(b=>b.onclick=()=>{
   const i=+b.dataset.q;
-  if(i>S.bulk){if(i!==S.bulk+1||!pay(pxAny(BULK[i][1])))return;S.bulk=i;save()}
+  if(i>S.bulk){if(i!==S.bulk+1||!pay(pxAny(BULK[i][1],'au')))return;S.bulk=i;save()}
   MODE=BULK[i][0];render();
 });
 let last=performance.now();
 setInterval(()=>{
   const t=performance.now(),dt=Math.min((t-last)/1000,1)*TSC();last=t;   // 시간 배율(TSC)을 dt에 곱해서 수입·자동구매·각성 자동이 같은 비율로 느려져요
-  const g=Big.mul(calc().ps,dt);S.money=Big.add(S.money,g);S.total=Big.add(S.total,g);clampMoney();
+  const g=Big.mul(calc().ps,dt);S.money=Big.add(S.money,g);S.total=Big.add(S.total,g);LIFE.ea(g);clampMoney();
   bkTick();bkAuto();autoBuy(dt);awAuto(dt);
   /* 화면 갱신은 한 번에 4.5ms쯤 걸려서, 0.3초에 한 번만 해요 (돈 계산은 그대로 0.1초마다). 탭이 가려져 있으면 건너뛰어요. 버튼을 누를 땐 따로 바로 갱신해요 */
   if(!document.hidden&&(++rdN%3===0))render();
@@ -2884,6 +2943,7 @@ function prestKeepList(nn){
 }
 const prestKeepTxt=nn=>{const l=prestKeepList(nn);return l.length?`${l.join('·')} 유지 · 나머지 초기화`:'돈·진행 초기화'};
 function wipeRun(keep,parts){
+  pxDirty();
   const q=parts||{},prog={};
   if(q.units)prog.units=S.units;
   if(q.auto)prog.auto=S.auto;
@@ -3429,7 +3489,7 @@ function nextExtra(){                         // 16-5 자동구매: 명성 26~ �
     const n=p41n();
     if(n<P41_MAX){
       const m=n+1,need=Big.fromLog10(m);
-      if(has(need)&&(!best||Big.lt(need,best.cost)))best={cost:need,run:()=>{S.money=Big.div(Big.add(S.money,need),need);S.pt.p41=m}};
+      if(has(need)&&(!best||Big.lt(need,best.cost)))best={cost:need,run:()=>{const b0=Big.add(S.money,need);S.money=Big.div(b0,need);LIFE.sp(Big.max(Big.sub(Big.sub(b0,S.money),need),0));S.pt.p41=m}};
     }
   }
   if(realPrest()>=48){                         // 명성 48(복리 이자율 최대치 +0.1%)도 같이 사요
@@ -3538,7 +3598,7 @@ function reserveFor(tier){
 function buyJob(tier,get){
   const n=get();
   if(!n||!okCost(n.cost)||!Big.gte(Big.sub(S.money,n.cost),reserveFor(tier)))return false;
-  S.money=Big.sub(S.money,n.cost);n.run();return true;
+  S.money=Big.sub(S.money,n.cost);LIFE.sp(n.cost);pxDirty();n.run();return true;
 }
 function paTick(dt){
   const p=prestigeOf();
@@ -3648,7 +3708,7 @@ function ubCands(){   // 지금 돈으로 살 수 있는 것 전부. sl이 있�
       if(prestigeOf()>=5&&e.lb){const l=lbN(e.k);if(l<lbMax(e.k))add({n:'한계 돌파',cost:LB_COST(e.base,l),run:()=>{S.lb[e.k]=l+1},en:1})}
     }
   }
-  cg=1;const bi=(S.bulk||0)+1;if(BULK[bi])add({n:'한번에 구매',cost:pxAny(BULK[bi][1]),run:()=>{S.bulk=bi},en:1});
+  cg=1;const bi=(S.bulk||0)+1;if(BULK[bi])add({n:'한번에 구매',cost:pxAny(BULK[bi][1],'au'),run:()=>{S.bulk=bi},en:1});
   const fs=[nextTier,nextP24,nextP19,nextPaSp,nextBkIv,nextBkRt];
   for(const lane of lbLanes())fs.push(()=>nextLb(lane));
   for(const f of fs){let b=null;try{b=f()}catch(x){}if(b&&b!=='skip'&&typeof b.run==='function'&&b.cost!==undefined)add({n:'보상',cost:b.cost,run:b.run,en:1,g:0,gb:2})}
@@ -3750,7 +3810,7 @@ function ubStep(){
     const now=performance.now(),dt=Math.min(1,UB.t0?(now-UB.t0)/1000:0.1);UB.t0=now;UB.tok=Math.min(Math.max(1,UB.rate),(UB.tok||0)+UB.rate*dt);
     {const w=(UB.b>=3&&!UB.tg.aw)?1:0;if(UB._aw!==w){UB._aw=w;S.awOff=w}}   // 봇이 각성석 자동을 켜고 꺼요 (바뀔 때만)
     if((S.bulk||0)>0&&MODE!==BULK[S.bulk][0]){MODE=BULK[S.bulk][0]}   // 수량 버튼이 열리면 가장 큰 것을 골라 줘요
-    if(UB.a>=1&&UB.tg.click){const A=mult(),kp=UB_CPS*dt*TSC();for(let n=1;n<=S.nb;n++){const v=Big.mul(press(n,A),kp);S.money=Big.add(S.money,v);S.total=Big.add(S.total,v)}clampMoney()}   // 손으로 버튼 누르기
+    if(UB.a>=1&&UB.tg.click){const A=mult(),kp=UB_CPS*dt*TSC();for(let n=1;n<=S.nb;n++){const v=Big.mul(press(n,A),kp);S.money=Big.add(S.money,v);S.total=Big.add(S.total,v);LIFE.ea(v)}clampMoney()}   // 손으로 버튼 누르기
     {const pr=realPrest();   // 실버·골드 누르기, 46을 열었으면 자동 누르기 속도도 그 재산으로 (산 값의 10배 이상 모였을 때만)
       for(let i=0;i<2;i++)if(pr>=WL[i].at&&UB.a>=7+i)S.pt['wlth_'+WL[i].k]=Big.add(wlAmt(i),Big.mul(wlGainOf(i),UB_CPS*dt));
       if(pr>=U46_AT&&S.pt.u46)for(let i=0;i<2;i++){if(pr<WL[i].at||UB.a<7+i)continue;for(let t=0;t<50;t++){const n=waLv(i);if(n>=WA_MAX)break;const c=waCost(i,n),have=wlAmt(i);if(!Big.gte(have,Big.mul(c,10)))break;S.pt['wlth_'+WL[i].k]=Big.sub(have,c);S.pt[i?'wa2':'wa1']=n+1}}}
@@ -3911,7 +3971,7 @@ window.addEventListener('acc-change',()=>{
 load();
 if(S.ts&&S.aw10){
   const dt=Math.min((Date.now()-S.ts)/1000,offlineCap());
-  if(dt>10){const g=Big.mul(Big.mul(Big.mul(calc().ps,dt),offlineMult()),TSC());if(Big.cmp(g,0)>0){S.money=Big.add(S.money,g);S.total=Big.add(S.total,g);clampMoney();msg=`자리를 비운 동안 ${fmt(g)}원 벌었어요. (최대 ${fmt(offlineMin())}분 · ×${fmt(offlineMult())})`;msgT=Date.now()+6000;nfPush('off','오프라인 수입',`${fmt(g)}원 (최대 ${fmt(offlineMin())}분 · ×${fmt(offlineMult())})`,{force:1})}}
+  if(dt>10){const g=Big.mul(Big.mul(Big.mul(calc().ps,dt),offlineMult()),TSC());if(Big.cmp(g,0)>0){S.money=Big.add(S.money,g);S.total=Big.add(S.total,g);LIFE.ea(g);clampMoney();msg=`자리를 비운 동안 ${fmt(g)}원 벌었어요. (최대 ${fmt(offlineMin())}분 · ×${fmt(offlineMult())})`;msgT=Date.now()+6000;nfPush('off','오프라인 수입',`${fmt(g)}원 (최대 ${fmt(offlineMin())}분 · ×${fmt(offlineMult())})`,{force:1})}}
 }
 render();
 /* ---------- 설정 앱 (iPhone/iPad 모드 선택, 오른쪽 끝에 밀어 넣기) ---------- */
@@ -4200,6 +4260,8 @@ pan.addEventListener('click',e=>{if(pan.classList.contains('inpane'))return;if(e
 
 /* 업데이트 목록: 여기만 고치면 iPad·Mac 업데이트 앱, iPhone 앱 보관함, 설정 > 업데이트에 다 같이 나와요. s: 'soon'=예정, 'done'=됨 */
 window.UPDATES_LIST=[
+    {id:21,s:'done',d:'2026-10-29',t:'가격이 버는 능력에 맞춰져요',x:'돈으로 사는 모든 것(환생 포함)의 가격이 내가 벌 수 있는 돈(초당 수입·버튼 수입·각성·환생 배율 등)에 따라 정해져요. 많이 벌수록 비싸지고, 구매하거나 환생·명성을 한 뒤에만 다시 계산돼서 그 전까지는 가격이 안 바뀌어요.'},
+    {id:20,s:'done',d:'2026-10-29',t:'운영자 앱 📊 기록',x:'운영자 앱에 📊 기록 칸이 생겼어요. 플레이어마다 누적 사용한 돈·누적 보유한 돈(번 돈 합계)·환생·명성·각성석·플레이타임을 볼 수 있고, 누적 보유·누적 사용·환생·명성·각성석 순으로 줄 세울 수 있어요. 기록은 게임을 켜 두면 30초마다 서버에 올라가고, 누적 사용은 이 업데이트 뒤부터 쌓여요.'},
     {id:19,s:'done',d:'2026-10-28',t:'Mac 모드에서 iPad 표시 없애기',x:'Mac 모드인데 iPad용 창 크기 손잡이(아래쪽 작은 막대)와 설정의 2줄 방식이 남아 있던 걸 고쳤어요.'},
     {id:18,s:'done',d:'2026-10-28',t:'설정에서 쓸 수 있는 것만 보이기',x:'설정 왼쪽 목록에 지금 모드에서 쓸 수 없는 칸(진동·알림 등)이 같이 보이던 걸 고쳤어요. 이제 쓸 수 있는 칸만 보여요.'},
     {id:17,s:'done',d:'2026-10-28',t:'삭제된 계정 30일 보관·복구',x:'운영자가 계정을 지우면 순위에서는 바로 사라지지만 서버에 30일 동안 보관돼요. 그 안에는 운영자 앱의 🗂️ 삭제된 계정에서 복구할 수 있고, 30일이 지나면 완전히 지워져요.'},
@@ -6409,6 +6471,18 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     }catch(e){}
     busy=false;
   }
+  /* 계정 기록(누적 사용·보유, 환생·명성·각성석)을 서버에 올려요. 운영자 앱의 📊 기록에서 봐요 */
+  let lastStat=0,lastStatKey='';
+  async function publishStats(force){
+    const a=window.ACC&&window.ACC.me();if(!a||!ok()||!CODE||canWrite===false)return;
+    if(norm(a.name)===window.ACC.OP)return;
+    const now=Date.now();if(!force&&now-lastStat<30000)return;
+    let st;try{st=LIFE.snap()}catch(e){return}
+    const k=a.id+JSON.stringify(st);if(!force&&k===lastStatKey&&now-lastStat<300000)return;
+    lastStat=now;lastStatKey=k;
+    try{await rpc('publish_stats',{p_id:uid+'_'+a.id,p_token:TOK,p_code:CODE,p_stats:st})}catch(e){}
+  }
+  window.MB_pubStats=publishStats;
   // 이름 검사: 다른 플레이어가 이미 쓰는 이름이면 막아요
   window.ACC_REMOTE_CHECK=async(name)=>{
     if(!ok()||!CODE)return '';
@@ -6496,7 +6570,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     const rw=$c('cm-rw');if(rw)rw.textContent=rkTab==='play'?rwTxt:'👑 재산 1등 보너스 · 돈의 가치 +100%';
     if(rkTab==='play'){
       try{
-        await publish(true);await publishPlay(true);
+        await publish(true);await publishPlay(true);publishStats(true);
         const rows=await rpc('get_top_play',{p_limit:TOP+30,p_code:CODE});
         const docs=(rows||[]).filter(p=>norm(p.name)!==window.ACC.OP).slice(0,TOP);
         let mine=-1;
@@ -6553,7 +6627,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     if(ready&&!ok()){const s=document.createElement('small');s.textContent='순위 서버에 연결하지 못했어요.';b.append(s)}
   }
   window.addEventListener('acc-change',()=>{paint();lastPub=0;publish(true)});
-  setInterval(()=>{if(!inst)return;if(!$c('scomm')?.childElementCount)paint();publish(false);publishPlay(false)},10000);
+  setInterval(()=>{if(!inst)return;if(!$c('scomm')?.childElementCount)paint();publish(false);publishPlay(false);publishStats(false)},10000);
   
   (function wait(){if($c('scomm'))paint();else setTimeout(wait,300)})();
   window.MB_rpc=rpc;window.MB_code=()=>CODE;
@@ -6578,6 +6652,8 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   '.opb{background:var(--card,#fff);color:var(--ink,#222);border:1px solid var(--line,#ccc);border-radius:18px;width:min(440px,100%);max-height:86vh;overflow:auto;padding:14px}'+
   '.opb h3{margin:0 0 8px;font-size:17px}.opr{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line,#ddd)}.opr .n{flex:1;min-width:0;word-break:break-all}.opr small{display:block;color:var(--sub,#666)}'+
   '.opb input{width:100%;box-sizing:border-box;padding:9px;margin:4px 0;border-radius:10px;border:1px solid var(--line,#ccc);font-size:16px}.opb .row{display:flex;gap:8px;margin-top:8px}.opb .row button{flex:1}.opm{font-size:13px;color:var(--sub,#666);min-height:1.2em;margin:6px 0;white-space:pre-wrap}'+
+  '.opt{display:flex;gap:6px;margin:6px 0}.opt.w{flex-wrap:wrap}.opt button{flex:1;padding:8px 6px;border-radius:10px;border:1px solid var(--line,#ccc);background:transparent;color:inherit;font-size:14px}.opt.w button{flex:1 1 30%}.opt button.on{background:rgba(74,157,107,.22);font-weight:700}'+
+  '.opc{border:1px solid var(--line,#ddd);border-radius:12px;padding:8px 10px;margin:6px 0}.oph{display:flex;align-items:center;gap:8px;cursor:pointer}.oph .rk{width:26px;text-align:center;font-weight:700;flex:none}.oph .t{flex:1;min-width:0;word-break:break-all}.oph small{display:block;color:var(--sub,#666)}.opkv{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:14px}.opkv span:last-child{text-align:right;word-break:break-all}'+
   '.opb.inpane{background:transparent;border:0;border-radius:0;width:auto;max-height:none;overflow:visible;padding:4px 0 24px}.opb.inpane .opx{display:none}#ophold{display:none}';
   document.head.appendChild(css);
 
@@ -6593,8 +6669,43 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   root.addEventListener('click',e=>{if(e.target===root)root.hidden=true});
   let note='';
   const head=t=>{box.textContent='';const h=el('h3',null,t);box.append(h)};
+  /* ---------- 📊 기록: 플레이어마다 누적 사용·누적 보유·환생·명성·각성석 ---------- */
+  let stSort='ea';
+  const SORTS=[['ea','💰 누적 보유','eal'],['sp','💸 누적 사용','spl'],['reb','♻️ 환생','rbt'],['pr','🏅 명성','pr'],['aw','✨ 각성석','awl']];
+  const tabs=a=>{const r=el('div','opt');[['list','👥 계정'],['stats','📊 기록']].forEach(([k,t])=>{const b=btn(t,()=>{if(k==='list')showList();else showStats()});if(k===a)b.className='on';r.append(b)});return r};
+  const fT=t=>{t=Math.max(0,Math.floor(Number(t)||0));const d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60);return d?d+'일 '+h+'시간':h?h+'시간 '+m+'분':m?m+'분':t+'초'};
+  const ago=t=>{t=Number(t)||0;if(!t)return '기록 없음';const s=Math.max(0,Math.floor((Date.now()-t)/1000));return s<90?'방금':s<5400?Math.round(s/60)+'분 전':s<172800?Math.round(s/3600)+'시간 전':Math.round(s/86400)+'일 전'};
+  const dstr=t=>{t=Number(t)||0;if(!t)return '-';const d=new Date(t);return d.getFullYear()+'.'+(d.getMonth()+1)+'.'+d.getDate()};
+  async function showStats(msg){
+    head('📊 계정 기록');box.append(tabs('stats'));
+    const m=el('div','opm',msg||'플레이어가 게임을 켜 두면 30초마다 서버에 올라와요. 카드를 누르면 자세히 보여요.');box.append(m);
+    const sr=el('div','opt w');SORTS.forEach(([k,t])=>{const b=btn(t,()=>{stSort=k;showStats()});if(k===stSort)b.className='on';sr.append(b)});box.append(sr);
+    const lst=el('div');box.append(lst);const row=el('div','row');box.append(row);
+    row.append(btn('새로고침',()=>showStats()),(()=>{const c=btn('닫기',()=>{root.hidden=true});c.className='opx';return c})());
+    try{
+      let rows=(await rpc('admin_list_stats',{p_key:ls('mb-owner-key'),p_code:window.MB_code()})||[]).filter(p=>String(p.name||'').normalize('NFC').trim().toLowerCase()!==window.ACC.OP);
+      const sk=(SORTS.find(x=>x[0]===stSort)||SORTS[0])[2];
+      const val=p=>{const st=p.stats;if(!st||!st.v)return -Infinity;const v=Number(st[sk]);return isFinite(v)?v:-Infinity};
+      rows=rows.slice().sort((a,b)=>val(b)-val(a));
+      if(!rows.length){lst.textContent='아직 다른 계정이 없어요.';return}
+      const have=rows.filter(p=>p.stats&&p.stats.v).length;
+      m.textContent=(msg||'플레이어가 게임을 켜 두면 30초마다 서버에 올라와요. 카드를 누르면 자세히 보여요.')+'\n계정 '+rows.length+'개 · 기록이 있는 계정 '+have+'개';
+      rows.forEach((p,i)=>{
+        const st=p.stats&&p.stats.v?p.stats:null,c=el('div','opc'),hd=el('div','oph'),bd=el('div');bd.hidden=true;
+        const tt=el('div','t');tt.append(el('span',null,(p.emoji||'🙂')+' '+(p.name||'?')),el('small',null,st?('💰 '+st.ea+' · 💸 '+st.sp+' · ♻️ '+st.reb+' · 🏅 '+st.pr):'아직 기록이 없어요'));
+        hd.append(el('div','rk',String(i+1)),tt);
+        if(st){
+          [['💸 누적 사용',st.sp+'원'],['💰 누적 보유 (번 돈 합계)',st.ea+'원'],['👑 최고 보유',st.pk+'원'],['💵 지금 돈',st.mn+'원'],
+           ['♻️ 환생',st.reb+'번 · 누적 '+st.rbt+'번'],['🏅 명성',String(st.pr)],['✨ 각성석',st.aw+'개 · 최고 기록 10^'+st.awe],
+           ['⏱️ 플레이타임',fT(p.play)],['📅 기록 시작',dstr(st.t0)],['🔄 마지막 기록',ago(p.stats_ts)]
+          ].forEach(([a,b])=>{const r=el('div','opkv');r.append(el('span',null,a),el('span',null,b));bd.append(r)});
+        }else bd.append(el('div','opm','이 계정은 이 업데이트가 들어간 게임을 한 번 켜면 기록이 올라와요.'));
+        const br=el('div','row');br.append(btn('💰 재산 주기',()=>giftForm(p)),btn('🗑️ 삭제',()=>delConfirm(p)));bd.append(br);
+        hd.onclick=()=>{bd.hidden=!bd.hidden};c.append(hd,bd);lst.append(c)});
+    }catch(e){m.textContent=errT(e)}
+  }
   async function showList(msg){
-    head('🛠️ 운영자 앱');const m=el('div','opm',msg||'계정을 고르면 재산을 주거나 삭제할 수 있어요. 상대에게 알림이 가요.');box.append(m);
+    head('🛠️ 운영자 앱');box.append(tabs('list'));const m=el('div','opm',msg||'계정을 고르면 재산을 주거나 삭제할 수 있어요. 상대에게 알림이 가요.');box.append(m);
     const lst=el('div');box.append(lst,el('div','row'));box.lastChild.append(btn('🗂️ 삭제된 계정',()=>showDeleted()),(()=>{const c=btn('닫기',()=>{root.hidden=true});c.className='opx';return c})());
     try{
       const rows=(await rpc('get_top',{p_limit:200,p_code:window.MB_code()})||[]).filter(p=>String(p.name||'').normalize('NFC').trim().toLowerCase()!==window.ACC.OP);
@@ -6685,7 +6796,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
         for(const n of rows){
           if(String(n.target).indexOf(uid+'_')!==0)continue;
           const aid=String(n.target).slice(uid.length+1),acc=(window.ACC.list()||[]).find(x=>x.id===aid);
-          if(n.kind==='gift'){const v=money(n.amount);S.money=Big.add(S.money,v);S.total=Big.add(S.total,v);try{clampMoney();save();render()}catch(e){}
+          if(n.kind==='gift'){const v=money(n.amount);S.money=Big.add(S.money,v);S.total=Big.add(S.total,v);LIFE.ea(v);try{clampMoney();save();render()}catch(e){}
             lines.push('🎁 운영자가 '+(acc?acc.name+' 계정에 ':'')+fmt(v)+'원을 보냈어요!'+(n.note?'\n'+n.note:''));opNf(n,'🎁','재산을 받았어요',(acc?acc.name+' 계정 · ':'')+fmt(v)+'원'+(n.note?' · '+n.note:''))}
           else if(n.kind==='delete'){const nm=acc?acc.name:'계정';try{const bn=localStorage.getItem('mb-bk-name');if(acc&&bn&&bn.normalize('NFC').trim().toLowerCase()===String(acc.name).normalize('NFC').trim().toLowerCase()){localStorage.removeItem('mb-bk-name');localStorage.removeItem('mb-bk-pass')}}catch(e){}if(acc)window.ACC.remove(aid);
             lines.push('🗑️ 운영자가 "'+nm+'" 계정을 삭제했어요. 순위에서 사라졌어요.'+(n.note?'\n'+n.note:''));opNf(n,'🗑️','계정이 삭제됐어요','"'+nm+'" 계정 · 순위에서 사라졌어요'+(n.note?' · '+n.note:''))}
