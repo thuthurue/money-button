@@ -4926,7 +4926,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     for(const k of [1,2]){
       const el=slotEl(k);if(!slotApp(k))WM.unshrink(k);
       const m=mini[k];el.classList.toggle('wmini',!!m);
-      if(!m){el.style.left=el.style.top=el.style.width=el.style.height='';rz[k].hidden=true;continue}
+      if(!m){el.style.left=el.style.top=el.style.width=el.style.height='';if(!(window.macOn&&window.macOn()))el.style.zIndex='';rz[k].hidden=true;continue}
       const pb=paneBox(el),[a,b]=colOf(el);
       if(!m.w){m.w=pb.w*.75;m.h=pb.h*.75;m.x=pb.x+(pb.w-m.w)/2;m.y=(pb.h-m.h)/2}   // 칸의 75% 크기, 칸 가운데
       if(lib.hidden){   // 앱이 차지했던 칸에 보관함이 보여요. 다른 앱이 그 칸을 이미 채웠으면 보관함이 앱 위로 올라오지 않게 숨겨 둬요
@@ -4958,7 +4958,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   }
   function gSync(){
     const m=mini.g;wrap.classList.toggle('wmini',!!m);gbar.hidden=!m;
-    if(!m){rz.g.hidden=true;if(wrap.style.width)wrap.style.left=wrap.style.top=wrap.style.width=wrap.style.height='';return}
+    if(!m){rz.g.hidden=true;if(!(window.macOn&&window.macOn()))wrap.style.zIndex='';if(wrap.style.width)wrap.style.left=wrap.style.top=wrap.style.width=wrap.style.height='';return}
     if(!m.w){const pb=paneBox(wrap);m.w=pb.w*.75;m.h=pb.h*.75;m.x=pb.x+(pb.w-m.w)/2;m.y=Math.max(34,(pb.h-m.h)/2)}
     gPlace();
   }
@@ -5202,7 +5202,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   const _wb=window.wmBar;window.wmBar=st=>{_wb(st);hdl.hidden=sb.hidden;if(sb.hidden&&ovState)ovShow(0)};
   /* ---------- iPad: 맞닿은 두 칸(앱·버튼 창·보관함) 사이의 세로선을 끌어 비율을 자유롭게 바꿔요 (Mac의 Split View처럼). 칸 경계가 1:2·2:2에 가까우면 착 붙어요 ---------- */
   const ipdvI=document.createElement('div');ipdvI.id='ipdv';document.body.appendChild(ipdvI);
-  const ipdvCss=document.createElement('style');ipdvCss.textContent='#ipdv{position:fixed;left:0;top:0;width:0;height:0;z-index:3}#ipdv i{position:fixed;display:block;width:24px;margin-left:-12px;cursor:col-resize;touch-action:none;-webkit-tap-highlight-color:transparent}#ipdv i::after{content:"";position:absolute;left:10px;top:50%;width:4px;height:48px;margin-top:-24px;border-radius:3px;background:var(--sub);opacity:.35;transition:opacity .15s,background .15s}#ipdv i.on::after{opacity:.95;background:var(--leaf)}';document.head.appendChild(ipdvCss);
+  const ipdvCss=document.createElement('style');ipdvCss.textContent='#ipdv{position:fixed;left:0;top:0;width:0;height:0;z-index:3}#ipdv i[hidden]{display:none}#ipdv i{position:fixed;display:block;width:24px;margin-left:-12px;cursor:col-resize;touch-action:none;-webkit-tap-highlight-color:transparent}#ipdv i::after{content:"";position:absolute;left:10px;top:50%;width:4px;height:48px;margin-top:-24px;border-radius:3px;background:var(--sub);opacity:.35;transition:opacity .15s,background .15s}#ipdv i.on::after{opacity:.95;background:var(--leaf)}';document.head.appendChild(ipdvCss);
   const IPD_DV=true;   // true로 바꾸면 iPad 앱 사이 세로선(비율 자유 조절)이 다시 생겨요
   const ipd_DVMIN=.6,ipd_DVSNAP=.07;let ipd_dvSig='',ipd_dvEls={};
   const ipd_dvRanges=()=>{   // 눈에 보이는 칸만. 앞에 있는 앱이 덮은 보관함은 빼요 (안 그러면 안 보이는 경계에 세로선이 떠요)
@@ -5297,6 +5297,12 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     hide:t=>{const f=WM.wins[t];if(!f)return false;f.g.hid=1;fwPlace(t);fwSave();return true}});
 
   const fws=WM.wins;let fz=5;
+  /* iPad: 작은 창(칸 앱·버튼 창)도 떠 있는 창처럼, 방금 만진 창이 맨 앞으로 와요 (같은 순서표 fz 사용). 작은 창이 아니게 되면 되돌려요 */
+  const ipdMac=()=>!!(window.macOn&&window.macOn());
+  const ipdFront=(el,k)=>{if(ipdMac()||UI.mode!=='ipad'||!mini[k]||!el||el.hidden)return;if(+el.style.zIndex===fz)return;el.style.zIndex=++fz;Object.keys(fws).forEach(q=>fws[q].el.classList.remove('act'))};
+  app.addEventListener('pointerdown',()=>ipdFront(app,1),true);app2.addEventListener('pointerdown',()=>ipdFront(app2,2),true);wrap.addEventListener('pointerdown',()=>ipdFront(wrap,'g'),true);
+  gbar.addEventListener('pointerdown',()=>ipdFront(wrap,'g'),true);
+  [1,2].forEach(k=>rz[k].addEventListener('pointerdown',()=>ipdFront(slotEl(k),k),true));rz.g.addEventListener('pointerdown',()=>ipdFront(wrap,'g'),true);
   /* ---------- 창 목록 (큰 공사 1단계): 칸 앱·작은 창·버튼 창·떠 있는 창·앱 함을 한 목록으로 읽어요. 읽기만 하고 동작은 바꾸지 않아요 ---------- */
   window.winList=function(){
     const out=[];
