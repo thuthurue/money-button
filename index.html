@@ -5093,17 +5093,17 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
     const h=rz[k];let d=null;
     h.addEventListener('pointerdown',e=>{const m=mini[k];if(!m)return;d={x:e.clientX,y:e.clientY,w:m.w,h:m.h};try{h.setPointerCapture(e.pointerId)}catch(_){}});
     h.addEventListener('pointermove',e=>{if(!d||!mini[k])return;const m=mini[k],pb=paneBox(slotEl(k)),sr=stage.getBoundingClientRect();
-      const fr=!(window.macOn&&window.macOn());   // iPad: Mac처럼 칸 자석 없이 오른쪽 아래로 원하는 크기까지 자유롭게
+      const fr=false;   /* 자유 크기 조절은 꺼 둠 (true로 바꾸면 iPad에서 칸 자석 없이 자유 조절) */   // iPad: Mac처럼 칸 자석 없이 오른쪽 아래로 원하는 크기까지 자유롭게
       m.w=Math.max(fr?RZ_MINW:pb.w*.4,Math.min(sr.width-m.x,d.w+e.clientX-d.x));m.h=Math.max(fr?RZ_MINH:pb.h*.4,Math.min(sr.height-m.y,d.h+e.clientY-d.y));wmPlace(k);if(fr){rzHide();return}const a=rzCalc(m.x,m.y,m.w,m.h);if(a.d<=RZ_MAG){m.w=a.rect.w;m.h=a.rect.h;wmPlace(k)}rzShow(a,m.x,m.y,m.w)});
-    const rend=()=>{if(d&&mini[k]&&mini[k].w){const m=mini[k],fr=!(window.macOn&&window.macOn()),a=rzCalc(m.x,m.y,m.w,m.h);if(!fr&&a.d<=RZ_SHOW){m.x=a.rect.x;m.y=a.rect.y;m.w=a.rect.w;m.h=a.rect.h;wmPlace(k)}if(slotApp(k))lszSet(slotApp(k),m.w,m.h)}d=null;rzHide()};h.addEventListener('pointerup',rend);h.addEventListener('pointercancel',rend);
+    const rend=()=>{if(d&&mini[k]&&mini[k].w){const m=mini[k],fr=false,a=rzCalc(m.x,m.y,m.w,m.h);if(!fr&&a.d<=RZ_SHOW){m.x=a.rect.x;m.y=a.rect.y;m.w=a.rect.w;m.h=a.rect.h;wmPlace(k)}if(slotApp(k))lszSet(slotApp(k),m.w,m.h)}d=null;rzHide()};h.addEventListener('pointerup',rend);h.addEventListener('pointercancel',rend);
   });
   (()=>{   // 버튼 작은 창: 오른쪽 아래 모서리로 크기 조절 (칸의 40%까지)
     const h=rz.g;let d=null;
     h.addEventListener('pointerdown',e=>{const m=mini.g;if(!m)return;d={x:e.clientX,y:e.clientY,w:m.w,h:m.h};try{h.setPointerCapture(e.pointerId)}catch(_){}});
     h.addEventListener('pointermove',e=>{if(!d||!mini.g)return;const m=mini.g,pb=paneBox(wrap),sr=stage.getBoundingClientRect();
-      const fr=!(window.macOn&&window.macOn());   // iPad: 칸 자석 없이 자유롭게
+      const fr=false;   /* 자유 크기 조절은 꺼 둠 (true로 바꾸면 iPad에서 칸 자석 없이 자유 조절) */   // iPad: 칸 자석 없이 자유롭게
       m.w=Math.max(fr?RZ_MINW:pb.w*.4,Math.min(sr.width-m.x,d.w+e.clientX-d.x));m.h=Math.max(fr?RZ_MINH:pb.h*.4,Math.min(sr.height-m.y-0,d.h+e.clientY-d.y));gPlace();if(fr){rzHide();return}const a=rzCalc(m.x,m.y-34,m.w,m.h+34);if(a.d<=RZ_MAG){m.w=a.rect.w;m.h=a.rect.h-34;gPlace()}rzShow(a,m.x,m.y-34,m.w)});
-    const rend=()=>{if(d&&mini.g&&mini.g.w){const m=mini.g,fr=!(window.macOn&&window.macOn()),a=rzCalc(m.x,m.y-34,m.w,m.h+34);if(!fr&&a.d<=RZ_SHOW){m.x=a.rect.x;m.y=a.rect.y+34;m.w=a.rect.w;m.h=a.rect.h-34;gPlace()}if(window.macOn&&window.macOn())window.macSnapG();lszSet('_btn',mini.g.w,mini.g.h)}d=null;rzHide()};h.addEventListener('pointerup',rend);h.addEventListener('pointercancel',rend);
+    const rend=()=>{if(d&&mini.g&&mini.g.w){const m=mini.g,fr=false,a=rzCalc(m.x,m.y-34,m.w,m.h+34);if(!fr&&a.d<=RZ_SHOW){m.x=a.rect.x;m.y=a.rect.y+34;m.w=a.rect.w;m.h=a.rect.h-34;gPlace()}if(window.macOn&&window.macOn())window.macSnapG();lszSet('_btn',mini.g.w,mini.g.h)}d=null;rzHide()};h.addEventListener('pointerup',rend);h.addEventListener('pointercancel',rend);
   })();
   setInterval(()=>{sbTick();wmBarSync()},1000);window.addEventListener('ubchg',()=>{try{wmBarSync()}catch(_){}});   // 봇 설정을 바꾸면 위 막대도 바로 바꿔요
 
@@ -5203,8 +5203,13 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   /* ---------- iPad: 맞닿은 두 칸(앱·버튼 창·보관함) 사이의 세로선을 끌어 비율을 자유롭게 바꿔요 (Mac의 Split View처럼). 칸 경계가 1:2·2:2에 가까우면 착 붙어요 ---------- */
   const ipdvI=document.createElement('div');ipdvI.id='ipdv';document.body.appendChild(ipdvI);
   const ipdvCss=document.createElement('style');ipdvCss.textContent='#ipdv{position:fixed;left:0;top:0;width:0;height:0;z-index:3}#ipdv i{position:fixed;display:block;width:24px;margin-left:-12px;cursor:col-resize;touch-action:none;-webkit-tap-highlight-color:transparent}#ipdv i::after{content:"";position:absolute;left:10px;top:50%;width:4px;height:48px;margin-top:-24px;border-radius:3px;background:var(--sub);opacity:.35;transition:opacity .15s,background .15s}#ipdv i.on::after{opacity:.95;background:var(--leaf)}';document.head.appendChild(ipdvCss);
+  const IPD_DV=true;   // true로 바꾸면 iPad 앱 사이 세로선(비율 자유 조절)이 다시 생겨요
   const ipd_DVMIN=.6,ipd_DVSNAP=.07;let ipd_dvSig='',ipd_dvEls={};
-  const ipd_dvRanges=()=>[wrap,app,app2,lib].filter(e=>e&&!e.hidden&&!e.classList.contains('wmini')&&e.style.gridColumn).map(e=>{const c=colOf(e);return[c[0]-1,c[1]-1]});
+  const ipd_dvRanges=()=>{   // 눈에 보이는 칸만. 앞에 있는 앱이 덮은 보관함은 빼요 (안 그러면 안 보이는 경계에 세로선이 떠요)
+    const fr=[wrap,app,app2].filter(e=>e&&!e.hidden&&!e.classList.contains('wmini')&&e.style.gridColumn&&e.offsetWidth>0).map(e=>{const c=colOf(e);return[c[0]-1,c[1]-1]});
+    const out=fr.slice();
+    if(lib&&!lib.hidden&&!lib.classList.contains('wmini')&&lib.style.gridColumn&&lib.offsetWidth>0){const c=colOf(lib),l=[c[0]-1,c[1]-1];if(!fr.some(r=>r[0]<l[1]&&r[1]>l[0]))out.push(l)}
+    return out};
   const ipd_dvBounds=rs=>[1,2].filter(k=>rs.some(r=>r[1]===k)&&rs.some(r=>r[0]===k));
   var ipd_dvAp=null;   // 지금 적용된 선 위치 [첫째 선, 둘째 선] (칸 단위, 전체 3). null이면 똑같은 3칸
   function ipd_dvAny(){try{return !!(mini[1]||mini[2]||mini.g||Object.keys(fws).some(t=>fws[t]&&fws[t].el&&!fws[t].el.hidden))}catch(_){return !!(mini[1]||mini[2]||mini.g)}}
@@ -5241,7 +5246,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   let ipd_dvRaf=0;function ipd_dvPoke(){if(ipd_dvRaf)return;ipd_dvRaf=requestAnimationFrame(()=>{ipd_dvRaf=0;try{gripPos();apGripPos()}catch(_){}try{window.dispatchEvent(new Event('resize'))}catch(_){}})}
   function ipd_dvSync(){
     try{
-      if(UI.mode!=='ipad'||UI.mac||gfull||stage.hidden){if(ipd_dvAp){ipd_dvAp=null;ipd_dvApply()}window.__dvBs=[];ipd_dvEach();return}
+      if(!IPD_DV||UI.mode!=='ipad'||UI.mac||gfull||stage.hidden){if(ipd_dvAp){ipd_dvAp=null;ipd_dvApply()}window.__dvBs=[];ipd_dvEach();return}
       const rs=ipd_dvRanges(),bs=ipd_dvBounds(rs),sig=rs.map(r=>r.join('-')).sort().join(',');
       window.__dvBs=bs;
       if(sig!==ipd_dvSig){ipd_dvSig=sig;const sv=UI.dv&&UI.dv.s===sig&&Array.isArray(UI.dv.b)?UI.dv.b.map(Number):null;ipd_dvAp=sv&&bs.length?sv:null;ipd_dvApply()}
