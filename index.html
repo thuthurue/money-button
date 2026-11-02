@@ -172,6 +172,7 @@ button:focus-visible{outline:3px solid var(--leaf);outline-offset:3px}
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);margin:0 -16px 6px;padding:6px 16px 4px;border-bottom:1px solid var(--line)}
 /* 돈 창은 기본 화면에서 항상 맨 앞에 떠 있어요 (스크롤해도 안 밀려요) */
 body:not(.ipad):not(.macon) .wrap:not(.mc) .top{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;width:100%;max-width:480px;margin:0 auto;box-sizing:border-box;z-index:60}
+.top .tprice{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:13px;line-height:1.35;color:var(--sub)}.top .tprice[hidden],.top .tprice span[hidden]{display:none}.top .tprice .ok{color:var(--leaf)}
 #topgap{display:none}body:not(.ipad):not(.macon) .wrap:not(.mc) #topgap{display:block}
 .toprow{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .top .bank{font-size:34px;line-height:1.15}
@@ -184,6 +185,7 @@ body:not(.ipad):not(.macon) .wrap:not(.mc) .top{position:fixed;top:env(safe-area
     <div class="toprow"><h1 id="gtitle">돈 버튼</h1><button id="reset">처음부터 다시 시작</button></div>
     <div class="bank"><span id="money">0</span><small>원</small></div>
     <div class="ckbank" id="ck-topbank" hidden>🌾 <b id="ck-topv">0</b><small>모이</small></div>
+    <div class="tprice" id="top-price" hidden><span id="tp-reb"></span><span id="tp-prest" hidden></span></div>
     <div id="nwdock" hidden><span id="nwd-ico">💬</span><p id="nwd1" hidden></p><p id="nwd2" hidden></p></div>
   </div>
   <p class="sum" id="money-exact"></p>
@@ -2239,6 +2241,11 @@ function render(){
   tickAwake();
   const r=calc(),prest=prestigeOf(),rp=realPrest(),cost=REB_COST(S.pow||0);
   set($('money'),fmt(S.money));set($('ps'),f1(r.ps));set($('am'),fmt(Big.mul(Big.mul(Big.mul(Big.mul(r.A,rebMult()),awakeMult()),moneySelf()),sqfMult())));
+  {const pr=$('top-price');if(pr){const ok=has(cost),goal=prestNeed(rp),need=Math.max(0,goal-(S.reb||0)),cap=rp>=prestCap(),showP=(rp>0||S.seen4)&&!cap;
+    const a=$('tp-reb'),b=$('tp-prest');
+    set(a,'♻️ 환생 '+fmt(cost)+'원'+(ok?' ✓':''));a.classList.toggle('ok',!!ok);
+    b.hidden=!showP;if(showP)set(b,'🏅 명성 환생 '+fmt(goal)+'번'+(need?' ('+fmt(need)+'번 더)':' ✓'));b.classList.toggle('ok',showP&&!need);
+    pr.hidden=false}}
   set($('money-exact'),Big.gte(S.money,1e4)&&Big.lt(S.money,1e15)?Math.floor(MN()).toLocaleString('ko-KR')+'원':'');
   nwRender();
   if((S.reb||0)>=1) S.seen4=1;
