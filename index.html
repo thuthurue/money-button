@@ -6691,7 +6691,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
   const head=t=>{box.textContent='';const h=el('h3',null,t);box.append(h)};
   /* ---------- 📊 기록: 플레이어마다 누적 사용·누적 보유·환생·명성·각성석 ---------- */
   let stSort='ea';
-  const SORTS=[['ea','💰 누적 보유','eal'],['sp','💸 누적 사용','spl'],['reb','♻️ 환생','rbt'],['pr','🏅 명성','pr'],['aw','✨ 각성석','awl']];
+  const SORTS=[['ea','💰 누적 보유','eal'],['sp','💸 누적 사용','spl'],['reb','♻️ 환생','rbt'],['pr','🏅 명성','pr'],['aw','✨ 각성석','awl'],['all','📋 모두 보기','eal']];   // 모두 보기: 순서는 누적 보유, 카드엔 다섯 가지 다
   const tabs=a=>{const r=el('div','opt');[['list','👥 계정'],['stats','📊 기록']].forEach(([k,t])=>{const b=btn(t,()=>{if(k==='list')showList();else showStats()});if(k===a)b.className='on';r.append(b)});return r};
   const fT=t=>{t=Math.max(0,Math.floor(Number(t)||0));const d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60);return d?d+'일 '+h+'시간':h?h+'시간 '+m+'분':m?m+'분':t+'초'};
   const ago=t=>{t=Number(t)||0;if(!t)return '기록 없음';const s=Math.max(0,Math.floor((Date.now()-t)/1000));return s<90?'방금':s<5400?Math.round(s/60)+'분 전':s<172800?Math.round(s/3600)+'시간 전':Math.round(s/86400)+'일 전'};
@@ -6715,7 +6715,8 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
         const tt=el('div','t');tt.append(el('span',null,(p.emoji||'🙂')+' '+(p.name||'?')),el('small',null,st?(()=>{   // 고른 항목을 맨 앞에 크게 보여 줘요 (이전엔 어느 탭이든 같은 글이라 정렬이 안 보였어요)
           const M={ea:'💰 누적 보유 '+st.ea,sp:'💸 누적 사용 '+st.sp,reb:'♻️ 누적 환생 '+st.rbt+'번',pr:'🏅 명성 '+st.pr,aw:'✨ 각성석 '+st.aw+'개'};
           const ks=Object.keys(M),first=M[stSort]?stSort:'ea';
-          return '▶ '+M[first]+'  |  '+ks.filter(k=>k!==first).map(k=>M[k]).join(' · ');
+          if(stSort==='all')return ks.map(k=>M[k]).join(' · ');
+          return M[first];   // 고른 항목만 보여요. 나머지는 카드를 눌러 펼치면 아래에 다 나와요
         })():'아직 기록이 없어요'));
         hd.append(el('div','rk',String(i+1)),tt);
         if(st){
