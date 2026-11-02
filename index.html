@@ -6725,7 +6725,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
            ['⏱️ 플레이타임',fT(p.play)],['📅 기록 시작',dstr(st.t0)],['🔄 마지막 기록',ago(p.stats_ts)]
           ].forEach(([a,b])=>{const r=el('div','opkv');r.append(el('span',null,a),el('span',null,b));bd.append(r)});
         }else bd.append(el('div','opm','이 계정은 이 업데이트가 들어간 게임을 한 번 켜면 기록이 올라와요.'));
-        const br=el('div','row');br.append(btn('💰 재산 주기',()=>giftForm(p)),btn('🗑️ 삭제',()=>delConfirm(p)));bd.append(br);
+        const br=el('div','row');br.append(btn('🎁 선물 주기',()=>giftForm(p)),btn('🗑️ 삭제',()=>delConfirm(p)));bd.append(br);
         hd.onclick=()=>{bd.hidden=!bd.hidden};c.append(hd,bd);lst.append(c)});
     }catch(e){m.textContent=errT(e)}
   }
@@ -6736,7 +6736,7 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
       const rows=(await rpc('get_top',{p_limit:200,p_code:window.MB_code()})||[]).filter(p=>String(p.name||'').normalize('NFC').trim().toLowerCase()!==window.ACC.OP);
       if(!rows.length)lst.textContent='아직 다른 계정이 없어요.';
       rows.forEach(p=>{const r=el('div','opr');const n=el('div','n');n.append(el('span',null,(p.emoji||'🙂')+' '+(p.name||'?')),el('small',null,p.money||'0'));
-        r.append(n,btn('💰',()=>giftForm(p)),btn('🗑️',()=>delConfirm(p)));lst.append(r)});
+        r.append(n,btn('🎁',()=>giftForm(p)),btn('🗑️',()=>delConfirm(p)));lst.append(r)});
     }catch(e){m.textContent=errT(e)}
   }
   async function showDeleted(msg){
@@ -6767,22 +6767,28 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
       catch(e){m.textContent=errT(e);ok.disabled=false}});
     row.append(btn('뒤로',()=>showDeleted()),ok);
   }
+  /* 주는 것 종류: 돈 말고도 줄 수 있어요. 서버는 그대로 두고 '하고 싶은 말' 앞에 종류 표시 [#종류] 를 붙여 보내요 */
+  const GIFTS=[['m','💰 돈','원'],['aw','✨ 각성석','개'],['reb','♻️ 환생 횟수','번'],['sil','🥈 실버','개'],['gol','🥇 골드','개']];
+  let giftKind='m';
   function giftForm(p,amt){
-    head('💰 재산 주기');box.append(el('div','opm',(p.emoji||'🙂')+' '+p.name+' 에게'));
-    const a=el('input');a.type='text';a.placeholder='금액 (예: 1000000 또는 1e30)';a.value=amt||'';a.autocomplete='off';
+    head('🎁 선물 주기');box.append(el('div','opm',(p.emoji||'🙂')+' '+p.name+' 에게'));
+    const kr=el('div','opt w');GIFTS.forEach(([k,t])=>{const b=btn(t,()=>{giftKind=k;giftForm(p,a.value.trim())});if(k===giftKind)b.className='on';kr.append(b)});box.append(kr);
+    const a=el('input');a.type='text';a.placeholder='수량 (예: 1000000 또는 1e30)';a.value=amt||'';a.autocomplete='off';
     const n=el('input');n.type='text';n.placeholder='하고 싶은 말 (없어도 돼요)';n.value=note;n.maxLength=100;
     const m=el('div','opm');
     box.append(a,n,m,el('div','row'));
     box.lastChild.append(btn('뒤로',()=>showList()),btn('다음',()=>{const v=a.value.trim().toLowerCase();note=n.value.trim();
-      if(!/^[0-9]{1,15}(\.[0-9]{1,6})?(e[0-9]{1,4})?$/.test(v)||!(Number(v)>0||/e/.test(v))){m.textContent='금액은 숫자나 1e30처럼 써 주세요';return}
+      if(!/^[0-9]{1,15}(\.[0-9]{1,6})?(e[0-9]{1,4})?$/.test(v)||!(Number(v)>0||/e/.test(v))){m.textContent='수량은 숫자나 1e30처럼 써 주세요';return}
+      if(giftKind==='reb'&&(!/^[0-9]{1,9}$/.test(v)||+v<1)){m.textContent='환생 횟수는 1 이상의 정수로 써 주세요';return}
       giftConfirm(p,v)}));
   }
   function giftConfirm(p,v){
-    head('💰 확인');let t='';try{t=fmt(money(v))}catch(e){t=v}
-    box.append(el('div','opm',p.name+' 에게 '+t+'원을 보낼까요?'+(note?'\n"'+note+'"':'')+'\n보내면 되돌릴 수 없고, 상대에게 알림이 가요.'));
+    head('🎁 확인');let t='';try{t=fmt(money(v))}catch(e){t=v}
+    const G=GIFTS.find(x=>x[0]===giftKind)||GIFTS[0];t=t+G[2];const what=giftKind==='m'?'':G[1].replace(/^\S+\s/,'');
+    box.append(el('div','opm',p.name+' 에게 '+(what?what+' ':'')+t+(G[2]==='개'?'를':'을')+' 보낼까요?'+(note?'\n"'+note+'"':'')+'\n보내면 되돌릴 수 없고, 상대에게 알림이 가요.'));
     const m=el('div','opm');const row=el('div','row');box.append(m,row);
     const ok=btn('✅ 확인, 보내기',async()=>{ok.disabled=true;m.textContent='보내는 중…';
-      try{await rpc('admin_gift_money',{p_key:ls('mb-owner-key'),p_code:window.MB_code(),p_target:p.id,p_amount:v,p_note:note});note='';showList('✅ '+p.name+' 에게 '+t+'원을 보냈어요. 상대가 게임을 켜면 알림이 떠요.')}
+      try{await rpc('admin_gift_money',{p_key:ls('mb-owner-key'),p_code:window.MB_code(),p_target:p.id,p_amount:v,p_note:(giftKind==='m'?'':'[#'+giftKind+']')+note});note='';showList('✅ '+p.name+' 에게 '+(what?what+' ':'')+t+(G[2]==='개'?'를':'을')+' 보냈어요. 상대가 게임을 켜면 알림이 떠요.')}
       catch(e){m.textContent=errT(e);ok.disabled=false}});
     row.append(btn('뒤로',()=>giftForm(p,v)),ok);
   }
@@ -6821,8 +6827,15 @@ body.ipad .wrap.ip1 #l-btn>p{grid-column:1/-1}
         for(const n of rows){
           if(String(n.target).indexOf(uid+'_')!==0)continue;
           const aid=String(n.target).slice(uid.length+1),acc=(window.ACC.list()||[]).find(x=>x.id===aid);
-          if(n.kind==='gift'){const v=money(n.amount);S.money=Big.add(S.money,v);S.total=Big.add(S.total,v);LIFE.ea(v);try{clampMoney();save();render()}catch(e){}
-            lines.push('🎁 운영자가 '+(acc?acc.name+' 계정에 ':'')+fmt(v)+'원을 보냈어요!'+(n.note?'\n'+n.note:''));opNf(n,'🎁','재산을 받았어요',(acc?acc.name+' 계정 · ':'')+fmt(v)+'원'+(n.note?' · '+n.note:''))}
+          if(n.kind==='gift'){
+            let gk='m',gn=String(n.note||'');const mk=/^\[#(m|aw|reb|sil|gol)\]/.exec(gn);if(mk){gk=mk[1];gn=gn.slice(mk[0].length)}
+            const v=money(n.amount);let nm='원',lb='재산';
+            if(gk==='m'){S.money=Big.add(S.money,v);S.total=Big.add(S.total,v);LIFE.ea(v)}
+            else if(gk==='aw'){S.awake=awAdd(S.awake||0,awBigQ(S.awake)||Big.cmp(v,1e299)>0?v:Big.toNum(v));nm='개';lb='각성석'}
+            else if(gk==='reb'){S.reb=(S.reb||0)+Math.min(1e9,Math.floor(Big.toNum(v)));nm='번';lb='환생 횟수'}
+            else{const i=gk==='sil'?0:1;S.pt=S.pt||{};S.pt['wlth_'+WL[i].k]=Big.add(wlAmt(i),v);nm='개';lb=i?'골드':'실버'}
+            try{clampMoney();save();render()}catch(e){}
+            lines.push('🎁 운영자가 '+(acc?acc.name+' 계정에 ':'')+(gk==='m'?'':lb+' ')+fmt(v)+nm+(nm==='개'?'를':'을')+' 보냈어요!'+(gn?'\n'+gn:''));opNf(n,'🎁',lb+'을 받았어요',(acc?acc.name+' 계정 · ':'')+fmt(v)+nm+(gn?' · '+gn:''))}
           else if(n.kind==='delete'){const nm=acc?acc.name:'계정';try{const bn=localStorage.getItem('mb-bk-name');if(acc&&bn&&bn.normalize('NFC').trim().toLowerCase()===String(acc.name).normalize('NFC').trim().toLowerCase()){localStorage.removeItem('mb-bk-name');localStorage.removeItem('mb-bk-pass')}}catch(e){}if(acc)window.ACC.remove(aid);
             lines.push('🗑️ 운영자가 "'+nm+'" 계정을 삭제했어요. 순위에서 사라졌어요.'+(n.note?'\n'+n.note:''));opNf(n,'🗑️','계정이 삭제됐어요','"'+nm+'" 계정 · 순위에서 사라졌어요'+(n.note?' · '+n.note:''))}
           else if(n.kind==='restore'){let inf={};try{inf=JSON.parse(n.info||'{}')}catch(e){}
