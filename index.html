@@ -32,7 +32,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap" rel="stylesheet">
 <style>
-html,body{overscroll-behavior:none;overflow-x:hidden;overscroll-behavior-x:none}   /* 좌우로는 안 밀리고 위아래로만 스크롤 */
+html,body{overscroll-behavior:none;overflow-x:hidden;overflow-x:clip;overscroll-behavior-x:none}   /* 좌우로는 안 밀리고 위아래로만 스크롤 */
 body{-webkit-touch-callout:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 input,textarea,select{font-size:max(16px,1em)}   /* iPad Safari가 입력 칸을 누르면 화면을 확대하지 않게 */   /* Mac 트랙패드 두 손가락 스와이프로 뒤로가기·앞으로가기가 되지 않게 */
 :root{--bg:#dfe8dc;--card:#f6f8f2;--ink:#2b2119;--sub:#66695a;--bark:#7a5636;--leaf:#4f8a4a;--leaf-soft:#cfe2c6;--line:#b3bfac;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -170,12 +170,16 @@ button:focus-visible{outline:3px solid var(--leaf);outline-offset:3px}
 @media (prefers-reduced-motion:reduce){#nwdock,#nwdock.jelly,.top.docked,.top.docked.ripple,#nwin.nwpop{animation:none}}
 #reset{background:none;border:0;color:var(--sub);text-decoration:underline;cursor:pointer;padding:6px 0;font-size:12px}
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);margin:0 -16px 6px;padding:6px 16px 4px;border-bottom:1px solid var(--line)}
+/* 돈 창은 기본 화면에서 항상 맨 앞에 떠 있어요 (스크롤해도 안 밀려요) */
+body:not(.ipad):not(.macon) .wrap:not(.mc) .top{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;width:100%;max-width:480px;margin:0 auto;box-sizing:border-box;z-index:60}
+#topgap{display:none}body:not(.ipad):not(.macon) .wrap:not(.mc) #topgap{display:block}
 .toprow{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .top .bank{font-size:34px;line-height:1.15}
 .top .bank small{font-size:16px}
 .top .ckbank{font-size:22px;line-height:1.25}.top .ckbank b{font-weight:inherit;word-break:break-all}.top .ckbank small{font-size:14px;color:var(--sub);margin-left:4px}.top .ckbank[hidden]{display:none}
 </style>
 <div class="wrap">
+  <div id="topgap" aria-hidden="true"></div>
   <div class="top">
     <div class="toprow"><h1 id="gtitle">돈 버튼</h1><button id="reset">처음부터 다시 시작</button></div>
     <div class="bank"><span id="money">0</span><small>원</small></div>
@@ -7180,7 +7184,7 @@ addEventListener('touchcancel',()=>{clearTimeout(tm);if(live&&!hold){live=0;canc
 </script>
 <style>
 :root{--phh:calc(env(safe-area-inset-top,0px) + 54px)}
-body.phoneos{padding-top:var(--phh)}body.phoneos .top{top:var(--phh)}
+body.phoneos{padding-top:var(--phh)}body.phoneos:not(.ipad):not(.macon) .wrap:not(.mc) .top{top:var(--phh)}
 #phsb{position:fixed;left:0;right:0;top:0;height:var(--phh);padding:calc(env(safe-area-inset-top,0px) + 6px) 30px 0;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;font:600 17px system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);z-index:99990;pointer-events:none;transition:background .2s,color .2s}
 #phsb>span{flex:1;min-width:0;white-space:nowrap}#phsb .pn{text-align:center;overflow:hidden;text-overflow:ellipsis}#phsb .pb{text-align:right}#phsb .pt{pointer-events:auto}#phsb[hidden]{display:none}#phsb.hm{background:transparent;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.45)}
 #phsb button{pointer-events:auto;background:none;border:0;font-size:18px;padding:2px 4px 2px 10px;color:inherit;font-family:inherit}
@@ -7536,5 +7540,10 @@ window.GF=GF;
     if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
   }catch(_){}
 })();
+</script>
+<script>
+(function(){const g=document.getElementById('topgap'),tp=document.querySelector('.top');if(!g||!tp)return;
+const f=()=>{g.style.height=(getComputedStyle(tp).position==='fixed'?tp.offsetHeight+6:0)+'px'};
+f();if(window.ResizeObserver)new ResizeObserver(f).observe(tp);addEventListener('resize',f);setInterval(f,1000)})();
 </script>
 </body></html>
