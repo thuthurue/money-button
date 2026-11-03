@@ -971,6 +971,7 @@ const RCD=window.RCD_OVERRIDE||[0,0,7.5,15.2,15.2,5,0.2,0,0,0];
 const RCDP=window.RCDP_OVERRIDE||{20:16.212,22:14.874,23:14.887,24:14.9,25:31.023,26:9.652,27:8.258,28:6.931,29:5.875,30:10.05,31:8.515,32:7.308,33:6.17,34:5.258,35:7.501,36:6.387,37:5.4,38:4.62,39:3.98,40:7.488,41:6.336,42:5.478,43:4.681,44:4.0,45:9.234,46:7.92,47:6.77,48:5.74,49:5.156};   // 명성별(올리기 전 명성 번호) 환생 최소 간격(초). 여기에 있으면 위 묶음 값보다 우선해요
 const rcdNeed=()=>{if(typeof GMODE!=='undefined'&&GMODE==='test')return 0;const p=(typeof S==='object'&&S&&S.prest)||0;if(RCDP[p]!==undefined)return RCDP[p];return RCD[Math.min(RCD.length-1,Math.floor(p/5))]||0};
 const rcdReady=()=>rcdT>=rcdNeed();
+const rcdLeft=()=>Math.max(0,rcdNeed()-rcdT),rcdTxt=()=>rcdLeft()>0?' · 쿨타임 '+(Math.ceil(rcdLeft()*10)/10).toFixed(1)+'초':'';   // 환생 쿨타임 남은 시간
 const rcdTry=()=>{if(!rcdReady())return false;rcdT=0;return true};
 {let L=performance.now();setInterval(()=>{const t=performance.now(),d=Math.min((t-L)/1000,1);pcdT+=d;rcdT+=d;L=t},100)}
 const rebMult=()=>Big.pow(Big.from(2),S.pow||0);             // 환생 배율 보상. 1e308에서 끊지 않아요
@@ -1157,7 +1158,7 @@ const sumCost=(base,g,l,k)=>{
 };
 const okCost=c=>typeof c==='number'?isFinite(c)&&c>=0:!!(c&&typeof c.m==='number'&&isFinite(c.e));
 const has=c=>okCost(c)&&Big.gte(S.money,c);
-function plan(base,g,l,cap,mode,cat,kind){const o=PXCTX;PXCTX=(cat||kind||'')+'|'+(base&&typeof base==='object'?base.m+'e'+base.e:base)+'|'+g+'|'+l;try{return plan0(base,g,l,cap,mode,cat,kind)}finally{PXCTX=o}}   // 상품마다 표식을 달아서 가격 배율을 따로 기억해요
+function plan(base,g,l,cap,mode,cat,kind){const o=PXCTX;PXCTX=(cat||kind||'')+'|'+(base&&typeof base==='object'?base.m+'e'+base.e:base)+'|'+g;try{return plan0(base,g,l,cap,mode,cat,kind)}finally{PXCTX=o}}   // 상품마다 표식을 달아서 가격 배율을 따로 기억해요
 function plan0(base,g,l,cap,mode=MODE,cat,kind){
   if(cap<1)return{k:0,cost:0};
   const f=cat?(1-disc(cat))*(1-disc2(cat))*(1-disc3(cat)):1;          // 할인 적용 후 가격 비율 (대략. 최대 개수 계산용)
@@ -1401,9 +1402,9 @@ let PXE_KS=[],PXE_DIRTY=true,PXE_BUSY=false;
 /* 가격은 상품마다 따로 기억해요: 한 상품의 가격 배율은 그 상품을 살 때(pxBuy)만 다시 계산하고, 다른 상품을 사도 안 바뀌어요.
    환생·명성·각성·테트레이션·계정 불러오기처럼 처음부터 다시 시작할 때는 전부 새로 매겨요. 테스트 모드는 적용 안 함 */
 let PXCTX='',PXLAST=null,PXC_SIG='',PXC_S=null;const PXC=new Map();
-const pxSig=()=>[S.reb,S.prest,S.tn,(typeof GMODE!=='undefined'?GMODE:'')].join();   // 환생·명성·테트레이션·모드가 바뀔 때만 전부 새로 매겨요 (각성을 사도 다른 상품 가격은 안 바뀌어요)
+const pxSig=()=>[S.reb,S.prest,S.tn,S.awN||0,(typeof GMODE!=='undefined'?GMODE:'')].join();   // 환생·명성·테트레이션·모드가 바뀔 때만 전부 새로 매겨요 (각성을 사도 다른 상품 가격은 안 바뀌어요)
 const pxDirty=()=>{PXE_DIRTY=true;if(typeof S==='object'&&S){const g=pxSig();if(g!==PXC_SIG||PXC_S!==S){PXC.clear();PXC_SIG=g;PXC_S=S}}};
-const pxBuy=()=>{};   // 상품 표식에 '산 횟수(단계)'가 들어 있어서, 산 상품은 저절로 새 표식(새 가격 배율)이 되고 다른 상품은 그대로예요. 예전처럼 '마지막으로 본 가격'을 지우면 자동구매 때 엉뚱한 상품 가격이 바뀌었어요
+const pxBuy=()=>{PXC.clear()};   // 상품 표식에 '산 횟수(단계)'가 들어 있어서, 산 상품은 저절로 새 표식(새 가격 배율)이 되고 다른 상품은 그대로예요. 예전처럼 '마지막으로 본 가격'을 지우면 자동구매 때 엉뚱한 상품 가격이 바뀌었어요
 function pxRecalc(){
   PXE_BUSY=true;
   try{
@@ -1421,7 +1422,7 @@ function pxRecalc(){
   SQF_MEMO=null;PRESS_F=null;PXE_DIRTY=false;PXE_BUSY=false;
 }
 const pxVid=v=>v&&typeof v==='object'?v.m+'e'+v.e+(v.l?'L':''):String(v);   // plan 밖에서 가격을 셀 때(자동구매·한계 돌파·속도·제곱·팩토리얼·환생 등)는 상품 이름표(tag)와 원래 가격으로 상품을 구분해요. 종류만 같고 서로 다른 상품이 배율을 같이 쓰면, 하나를 살 때 나머지 가격이 같이 바뀌었어요
-const PX=(k,id,tag)=>{if(typeof GMODE!=='undefined'&&GMODE==='test')return 1;if(PXE_BUSY)return 1;const key=k+'|'+PXCTX+(PXCTX===''&&id!==undefined?'|'+(tag||'')+'|'+pxVid(id):'');PXLAST=key;if(PXC.has(key))return PXC.get(key);if(PXE_DIRTY)pxRecalc();const v=PXE_KS[PXI(k)],r=v===undefined?1:v;PXC.set(key,r);return r};
+const PX=(k,id,tag)=>{if(typeof GMODE!=='undefined'&&GMODE==='test')return 1;if(PXE_BUSY)return 1;const key=k+'|'+PXCTX;PXLAST=key;if(PXC.has(key))return PXC.get(key);if(PXE_DIRTY)pxRecalc();const v=PXE_KS[PXI(k)],r=v===undefined?1:v;PXC.set(key,r);return r};
 function pxMul(v,k){
   if(k===1)return v;
   if(v&&typeof v==='object')return Big.mul(v,k);
@@ -2281,7 +2282,7 @@ function render(){
   set($('money'),fmt(S.money));set($('ps'),f1(TM(r.ps)));set($('am'),fmt(TM(Big.mul(Big.mul(Big.mul(Big.mul(r.A,rebMult()),awakeMult()),moneySelf()),sqfMult()))));
   {const pr=$('top-price');if(pr){const ok=has(cost),goal=prestNeed(rp),need=Math.max(0,goal-(S.reb||0)),cap=rp>=prestCap(),showP=(rp>0||S.seen4)&&!cap;
     const a=$('tp-reb'),b=$('tp-prest');
-    set(a,'♻️ 환생 '+fmt(cost)+'원'+(ok?' ✓':''));a.classList.toggle('ok',!!ok);
+    set(a,'♻️ 환생 '+fmt(cost)+'원'+(ok?' ✓':'')+rcdTxt());a.classList.toggle('ok',!!ok);
     b.hidden=!showP;if(showP)set(b,'🏅 명성 환생 '+fmt(goal)+'번'+(need?' ('+fmt(need)+'번 더)':' ✓'));b.classList.toggle('ok',showP&&!need);
     pr.hidden=false}}
   set($('money-exact'),Big.gte(S.money,1e4)&&Big.lt(S.money,1e15)?Math.floor(MN()).toLocaleString('ko-KR')+'원':'');
@@ -2293,7 +2294,7 @@ function render(){
   const keepMoney=prest>=2, keepProg=prest>=6, keepReb=prest>=7;
   set($('reb-next'),`이번 환생 ${fmt(S.reb)}번 · 열린 버튼 ${fmt(maxBtn())}개${maxBtn()>=btnCap()?' · '+btnCap()+'번까지':''}\n버는 배율 ×${fmt(rebMult())}`+(maxBtn()>=btnCap()?'\n버튼은 더 못 사고, 환생하면 배율만 2배':S.aw15&&baseSlots()>=BTN_MAX?`\n${maxBtn()+1}번 버튼은 환생 ${5-((S.rx||0)%5)}번 더 하면 열려요`:baseSlots()<BTN_MAX?`\n${maxBtn()+1}번 버튼은 환생 ${5-((S.rp||0)%5)}번 더 하면 열려요`:'')+(keepMoney?'\n명성 2: 환생해도 돈은 남아요':'')+(keepProg?'\n명성 6: 환생해도 진행은 남아요':'')+(discTxt('r')?'\n환생 '+discTxt('r'):''));
   const canReb=has(cost);nfFlag('reb',canReb,'환생할 수 있어요',`환생 가격 ${fmt(cost)}원`);
-  set($('reb-title'),(armedReb?'한 번 더 누르면 환생':'환생')+(rebChain()>1?` (최대 ${rebChain()}번 연속)`:''));
+  set($('reb-title'),(armedReb?'한 번 더 누르면 환생':'환생')+(rebChain()>1?` (최대 ${rebChain()}번 연속)`:'')+rcdTxt());
   set($('reb-sub'),armedReb?(keepProg?`환생 가격 ${fmt(cost)}원만 빠져요\n돈과 진행은 남아요 · 배율 ×${fmt(rebMult())} → ×${fmt(Big.mul(rebMult(),2))}`:keepMoney?`환생 가격 ${fmt(cost)}원만 빠져요\n남은 돈은 유지 · 진행은 초기화 · 배율 ×${fmt(rebMult())} → ×${fmt(Big.mul(rebMult(),2))}`:`돈과 업그레이드가 초기화돼요\n보상은 남아요 · 배율 ×${fmt(rebMult())} → ×${fmt(Big.mul(rebMult(),2))} · ${baseSlots()<BTN_MAX?Math.min(baseSlots()+1,BTN_MAX)+'번 버튼':S.aw15&&maxBtn()<BTN_TOP?'환생 5번마다 버튼 +1':'버튼 끝'}`):`가격 ${fmt(cost)}원\n${keepProg?'가격만 내고 돈·진행 유지':keepMoney?'가격만 내고 남은 돈은 유지':'돈·진행 초기화'} · 보상은 유지 · ×${fmt(Big.mul(rebMult(),2))}`);
   $('reb-btn').classList.toggle('can',canReb);
   $('reb-btn').classList.toggle('locked',!canReb&&!armedReb);
@@ -3085,7 +3086,7 @@ $('reb-btn').onclick=()=>{
   if(!has(cost)){msg=`환생하려면 ${fmt(cost)}원이 필요해요.`;msgT=Date.now()+4000;render();return}
   if(!armedReb){armedReb=true;render();setTimeout(()=>{armedReb=false;render()},3000);return}
   armedReb=false;
-  if(!rcdTry()){msg=`환생은 ${rcdNeed()}초 간격이에요.`;msgT=Date.now()+2000;render();return}
+  if(!rcdTry()){msg=`환생은 ${rcdNeed()}초 간격이에요. 남은 쿨타임 ${(Math.ceil(rcdLeft()*10)/10).toFixed(1)}초`;msgT=Date.now()+2000;render();return}
   const want=rebChain();let n=0;                         // 명성 26: 돈이 되는 만큼 연속으로 환생 (각 환생 가격은 따로 냄)
   do{doReb(false);n++}while(n<want&&has(REB_COST(S.pow||0)));
   if(n>1){msg=`연속 환생 ${n}번! `+msg;msgT=Date.now()+8000}
@@ -4394,7 +4395,6 @@ pan.addEventListener('click',e=>{if(pan.classList.contains('inpane'))return;if(e
 
 /* 업데이트 목록: 여기만 고치면 iPad·Mac 업데이트 앱, iPhone 앱 보관함, 설정 > 업데이트에 다 같이 나와요. s: 'soon'=예정, 'done'=됨 */
 window.UPDATES_LIST=[
-    {id:25,s:'done',d:'2026-11-03',t:'다른 걸 사도 가격이 안 바뀌어요',x:'한 상품의 가격은 그 상품을 사기 전까지 바뀌지 않아요. 자동구매·한계 돌파·자동구매 속도·제곱·팩토리얼·명성 속도 같은 걸 하나 사면 다른 상품 가격이 같이 오르던 걸 고쳤고, 각성을 사도 가격이 새로 매겨지지 않아요. 가격은 환생·명성·테트레이션을 할 때만 새로 매겨져요. 할인은 전처럼 사자마자 적용돼요.'},
     {id:24,s:'done',d:'2026-11-03',t:'명성 8~10이 쉬워졌어요',x:'명성 7→8부터 필요한 환생 횟수가 확 늘어나던 걸 줄였어요. 7→8은 52번에서 40번, 8→9는 79번에서 54번, 9→10은 109번에서 69번이에요.'},
     {id:23,s:'done',d:'2026-11-03',t:'각성 21 · 각성석 가치',x:'테트레이션이 5(최대)가 되면 각성 탭에서 각성 21을 살 수 있어요. n번 사면 각성석 가치가 ×n배가 돼요.'},
     {id:22,s:'done',d:'2026-11-02',t:'각성 20 · 테트레이션',x:'명성 50을 하면 각성 탭에 각성 20이 열리고, 사면 병아리 다음에 테트레이션 탭(앱)이 생겨요. 테트레이션을 누르면 지금까지의 진행이 전부 초기화되는 대신 테트레이션이 1 올라가고, 번 돈에 ×2↑↑n 배가 곱해져요(최대 5번). 이 배율은 가격이 오르는 데는 들어가지 않아요.'},
